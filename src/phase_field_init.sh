@@ -11,9 +11,11 @@ if [ "$#" != 4 ]; then
     exit 1
 fi
 
+pyx=python3 # Choose between python2 and python3
+
 # Format input params
-deform=$(python3 -c "print('{:.3f}'.format($deform))")
-peclet=$(python3 -c "print('{:.3f}'.format($peclet))")
+deform=$($pyx -c "print('{:.3f}'.format($deform))")
+peclet=$($pyx -c "print('{:.3f}'.format($peclet))")
 
 # A function for generating random numbers
 max_seed=1000000
@@ -24,9 +26,9 @@ function get_rand(){
 }
 
 # Set the model parameters
-ncells=400 # 100
-ncell_x=20 # 10
-ncell_y=20 # 10
+ncells=100 # 100
+ncell_x=10 # 10
+ncell_y=10 # 10
 confine_radius=8.0 # 8.0
 init_radius=7.0 # 7.0
 ideal_radius=12.0 # 12.0
@@ -57,21 +59,21 @@ equildump_field_freq=10000 # 10000
 seed=$(get_rand)
 
 # Set alpha based on deformability
-alpha=$(python3 -c "print('{:f}'.format($epsilon/$deform))")
-kappa=$(python3 -c "print('{:f}'.format($alpha*2.0))")
+alpha=$($pyx -c "print('{:f}'.format($epsilon/$deform))")
+kappa=$($pyx -c "print('{:f}'.format($alpha*2.0))")
 
 # Set motility based on Peclet number, rotatioal diff, and ideal radius
-motility=$(python3 -c "print('{:f}'.format($peclet*$rotate_diff*$ideal_radius))")
+motility=$($pyx -c "print('{:f}'.format($peclet*$rotate_diff*$ideal_radius))")
 
 # Set a hexagonal lattice
 tmp_cm_file="cm_$seed.tmp"
 tmp_shape_file="shape_$seed.tmp"
-#size=$(python3 triangle.py $ncell_x $ncell_y $confine_radius $tmp_cm_file)
-#size=$(python3 square.py $ncell_x $ncell_y $confine_radius $tmp_cm_file)
-#size=$(python3 square.2.py 160 138 $ncell_x $ncell_y $confine_radius $tmp_cm_file)
+#size=$($pyx triangle.py $ncell_x $ncell_y $confine_radius $tmp_cm_file)
+#size=$($pyx square.py $ncell_x $ncell_y $confine_radius $tmp_cm_file)
+#size=$($pyx square.2.py 160 138 $ncell_x $ncell_y $confine_radius $tmp_cm_file)
 cutoff=0.2
 seed_2=$(get_rand)
-size=$(python3 triangle_noise.py $ncell_x $ncell_y $confine_radius $cutoff $seed_2 $tmp_cm_file)
+size=$($pyx triangle_noise.py $ncell_x $ncell_y $confine_radius $cutoff $seed_2 $tmp_cm_file)
 #size=$(python triangle_stretched_noise.py $ncell_x $ncell_y $confine_radius $cutoff $seed_2 $tmp_cm_file)
 
 lx=$(echo $size | awk '{print $3}')
