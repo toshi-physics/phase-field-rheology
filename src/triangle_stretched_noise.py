@@ -2,6 +2,7 @@
 # Genreate the coordinates of the cells' centre of mass which are
 # arranged in a triangular lattice (with noise)
 
+from __future__ import division
 import argparse
 import numpy as np
 
@@ -37,8 +38,8 @@ dy = ly/float(ny)
 print("lx = {:d} ly = {:d}".format(lx, ly))
 
 with open (outfile, "w") as writer:
-    for i in xrange(0,ncells):
-        x = dx*0.5*((i/nx)%2) + dx*(i%nx)
+    for i in range(0,ncells):
+        x = dx*0.5*((i//nx)%2) + dx*(i%nx)
         y = dy*(i/nx)
         if (rc > 0.0):
             rx = rng.normal(0.0,rc)

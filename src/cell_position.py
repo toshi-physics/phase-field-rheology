@@ -2,6 +2,7 @@
 # Genreate the coordinates of the cells' centre of mass, which are arranged in
 # a triangular lattice, and also their velocities
 
+from __future__ import division
 import argparse
 import random
 import math
@@ -34,7 +35,7 @@ print("lx = {:d} ly = {:d}".format(lx, ly))
 
 with open (outfile, "w") as writer:
     for i in xrange(0,ncells):
-        x = r*((i/nx)%2) + 2*r*(i%nx)
+        x = r*((i//nx)%2) + 2*r*(i%nx)
         y = 3**0.5*r*(i/nx)
         # Generate a random 2D direction [0,2*pi)
         theta = random.random()*2.0*pi

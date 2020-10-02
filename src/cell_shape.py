@@ -25,7 +25,7 @@ def circle(x, y, r):
     x0 = x/2
     y0 = y/2
     phi = [[phi0 if ((i-x0)**2+(j-y0)**2)**0.5 < r else 0.0 \
-            for j in xrange(ny)] for i in xrange(nx)]
+            for j in range(ny)] for i in range(nx)]
     return phi
 
 def square(x, y, l):
@@ -33,11 +33,11 @@ def square(x, y, l):
     y0 = y/2
     lh = l/2
     phi = [[phi0 if (abs(i-x0)<lh and abs(j-y0)<lh) else 0.0 \
-            for j in xrange(ny)] for i in xrange(nx)]
+            for j in range(ny)] for i in range(nx)]
     return phi
 
 def zeros(x, y):
-    phi = [[0.0 for j in xrange(ny)] for i in xrange(nx)]
+    phi = [[0.0 for j in range(ny)] for i in range(nx)]
     return phi
 
 if args.shape == "circle":
@@ -48,6 +48,6 @@ else:
     phi = zeros(nx, ny)
 
 with open(outfile, "w") as writer:
-    for i in xrange(nx):
-        for j in xrange(ny):
+    for i in range(nx):
+        for j in range(ny):
             writer.write("{:d} {:d} {:.5f}\n".format(i, j, phi[i][j]))

@@ -2,6 +2,7 @@
 # Genreate the coordinates of the cells' centre of mass which are
 # arranged in a triangular lattice
 
+from __future__ import division
 import argparse
 import math
 
@@ -27,9 +28,9 @@ ly = int(math.ceil(3**0.5*r*ny))
 print("lx = {:d} ly = {:d}".format(lx, ly))
 
 with open (outfile, "w") as writer:
-    for i in xrange(0,ncells):
-        x = r*((i/nx)%2) + 2*r*(i%nx)
-        y = 3**0.5*r*(i/nx)
+    for i in range(0,ncells):
+        x = r*((i//nx)%2) + 2*r*(i%nx)
+        y = 3**0.5*r*(i//nx)
 #        x = 3**0.5*r*(i/nx)
 #        y = r*((i/nx)%2) + 2*r*(i%nx)
         writer.write("{:d} {:.5f} {:.5f}\n".format(i,x,y))
