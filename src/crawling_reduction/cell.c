@@ -38,17 +38,9 @@ Cell* createCell(int x, int y, int lx, int ly,
   cell->vx = cos(cell->theta);
   cell->vy = sin(cell->theta);
   cell->v = 1.0;
-  cell->gyration = create1DDoubleArray(3);
   cell->chemPot = create2DDoubleArray(cell->lx, cell->ly);
-  for (int i = 0; i < 2; i++) {
-    cell->gradChemPot[i] = create2DDoubleArray(cell->lx, cell->ly);
-  }
-  for (int i = 0; i < 3; i++) {
-    cell->deform[i] = create2DDoubleArray(cell->lx, cell->ly);
-  }
-  for (int i = 0; i < 2; i++) {
-    cell->divDeform[i] = create2DDoubleArray(cell->lx, cell->ly);
-  }
+  cell->gradChemPot = create3DDoubleArray(cell->lx, cell->ly, 2);
+  cell->divDeform = create3DDoubleArray(cell->lx, cell->ly, 2);
   return cell;
 }
 
@@ -57,17 +49,9 @@ void deleteCell(Cell* cell) {
     free(cell->field[i]);
   }
   deleteRandom(cell->random);
-  free(cell->gyration);
   free(cell->chemPot);
-  for (int i = 0; i < 2; i++) {
-    free(cell->gradChemPot);
-  }
-  for (int i = 0; i < 3; i++) {
-    free(cell->deform[i]);
-  }
-  for (int i = 0; i < 2; i++) {
-    free(cell->divDeform[i]);
-  }
+  free(cell->gradChemPot);
+  free(cell->divDeform);
   free(cell);
 }
 
@@ -208,10 +192,10 @@ void shiftCoordinates(Cell* cell, int xShift, int yShift) {
   endUpdateCellField(cell);
 }
 
-void startUpdateCellField(Cell* cell) {
+inline void startUpdateCellField(Cell* cell) {
   cell->setIndex = (cell->getIndex == 1 ? 0 : 1);
 }
 
-void endUpdateCellField(Cell* cell) {
+inline void endUpdateCellField(Cell* cell) {
   cell->getIndex = cell->setIndex;
 }

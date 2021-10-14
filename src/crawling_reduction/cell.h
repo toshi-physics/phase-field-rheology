@@ -28,11 +28,9 @@ typedef struct {
   double deltaYCM;
   double volume; // Total volume of the cell
   double incell;
-  double* gyration; // Gyration tensor of the cell
   double** chemPot; // Chemical potential (func. deriv. of free energy wrt phi)
-  double** gradChemPot[2]; // Gradient of chemical potential
-  double** deform[3]; // Deformation tensor: Sxx, Syy, Sxy
-  double** divDeform[2]; // Divergence of deformation tensor
+  double*** gradChemPot; // Gradient of chemical potential
+  double*** divDeform; // Divergence of deformation tensor
 } Cell;
 
 Cell* createCell(int x, int y, int lx, int ly, double dr,

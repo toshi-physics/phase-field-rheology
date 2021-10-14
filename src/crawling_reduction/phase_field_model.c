@@ -38,23 +38,18 @@ PhaseFieldModel* createModel(int lx, int ly, int ncells) {
   model->totalField = create2DDoubleArray(model->lx, model->ly);
   model->totalFieldSq = create2DDoubleArray(model->lx, model->ly);
   model->laplaceTotalField = create2DDoubleArray(model->lx, model->ly);
-  for (int i = 0; i < 2; i++) {
-    model->totalCapillField[i] = create2DDoubleArray(model->lx, model->ly);
-    model->totalDeformField[i] = create2DDoubleArray(model->lx, model->ly);
-  }
+  model->totalCapillField = create3DDoubleArray(model->lx, model->ly, 2);
+  model->totalDeformField = create3DDoubleArray(model->lx, model->ly, 2);
   model->cellXCM = create1DDoubleArray(ncells);
   model->cellYCM = create1DDoubleArray(ncells);
   model->cellXBoundCount = create1DIntArray(ncells);
   model->cellYBoundCount = create1DIntArray(ncells);
   model->dumps = NULL;
   model->ndumps = 0;
-
-  int npairs = ncells*(ncells+1)/2; // Including self interacting terms
-  printf("npairs= %d\n", npairs);
-  model->overlapInt = create1DIntArray(npairs);
-  model->celldx = create1DIntArray(npairs);
-  model->celldy = create1DIntArray(npairs);
-  model->overlap = create2DDoubleArray(ncells,ncells);
+  model->numOfNeigh = create1DIntArray(ncells);
+  model->neighList = create2DIntArray(ncells, PF_MAXNEIGH);
+  model->cellDiffCoord = create3DIntArray(ncells, PF_MAXNEIGH, 3);  
+  model->overlap = create2DDoubleArray(ncells, ncells);
   model->overlapMat = create1DDoubleArray(ncells*ncells);
   model->capillForce = create2DDoubleArray(ncells, 2);
   model->activeForce = create2DDoubleArray(ncells, 2);
@@ -74,17 +69,15 @@ void deleteModel(PhaseFieldModel* model) {
   free(model->totalField);
   free(model->totalFieldSq);
   free(model->laplaceTotalField);
-  for (int i = 0; i < 2; i++) {
-    free(model->totalCapillField[i]);
-    free(model->totalDeformField[i]);
-  }
+  free(model->totalCapillField);
+  free(model->totalDeformField);
   free(model->cellXCM);
   free(model->cellYCM);
   free(model->cellXBoundCount);
   free(model->cellYBoundCount);
-  free(model->celldx);
-  free(model->celldy);
-  free(model->overlapInt);
+  free(model->numOfNeigh);
+  free(model->neighList);
+  free(model->cellDiffCoord);
   free(model->overlap);
   free(model->overlapMat);
   free(model->capillForce);
@@ -217,7 +210,7 @@ void run(PhaseFieldModel* model, int nsteps) {
 }
 
 void output(PhaseFieldModel* model, int step) {
-  if (step % 100 == 0) {
+  if (step % 1000 == 0) {
     printf("Step %d\n", step);
   }
   for (int i = 0; i < model->ndumps; i++) {
@@ -233,10 +226,10 @@ void updateTotalField(PhaseFieldModel* model) {
     for (int j = 0; j < model->ly; j++) {
       model->totalField[i][j] = 0.0;
       model->totalFieldSq[i][j] = 0.0;
-      model->totalCapillField[0][i][j] = 0.0;
-      model->totalCapillField[1][i][j] = 0.0;
-      model->totalDeformField[0][i][j] = 0.0;
-      model->totalDeformField[1][i][j] = 0.0;
+      model->totalCapillField[i][j][0] = 0.0;
+      model->totalCapillField[i][j][1] = 0.0;
+      model->totalDeformField[i][j][0] = 0.0;
+      model->totalDeformField[i][j][1] = 0.0;
     }
   }
 
@@ -304,10 +297,10 @@ void updateTotalCapillDeformField(PhaseFieldModel* model) {
       for (int j = 0; j < cly; j++) {
 	y = iwrap(model->ly, cy+j);
 	phi = cellField[i][j];
-	model->totalCapillField[0][x][y] -= phi*cell->gradChemPot[0][i][j];
-	model->totalCapillField[1][x][y] -= phi*cell->gradChemPot[1][i][j];
-	model->totalDeformField[0][x][y] += cell->divDeform[0][i][j];
-	model->totalDeformField[1][x][y] += cell->divDeform[1][i][j];
+	model->totalCapillField[x][y][0] -= phi*cell->gradChemPot[i][j][0];
+	model->totalCapillField[x][y][1] -= phi*cell->gradChemPot[i][j][1];
+	model->totalDeformField[x][y][0] += cell->divDeform[i][j][0];
+	model->totalDeformField[x][y][1] += cell->divDeform[i][j][1];
       }
     }
   }
@@ -317,78 +310,112 @@ void updateOverlap(PhaseFieldModel* model) {
   Cell* cellm;
   Cell* celln;
   int clxm, clym, cxm, cym, cxn, cyn;
-  int pairmn;
+  int xdiff, ydiff;
+  int neighm, neighn;
   double** phim;
   double** phin;
   int ncells = model->numOfCells;
-
+  
   // Check which subdomains overlap with one another
   // This is essentially a neighbour list for each cell
   for (int m = 0; m < ncells; m++) {
     cellm = model->cells[m];
-    phim = cellm->field[cellm->getIndex];
     clxm = cellm->lx;
     clym = cellm->ly;
     cxm = iwrap(model->lx, cellm->x);
-    cym = iwrap(model->ly, cellm->y);
-    
-    // For self-overlap
-    pairmn = getPairIndex(m,m);
-    model->overlapInt[pairmn] = 1;
-    model->celldx[pairmn] = 0;
-    model->celldy[pairmn] = 0;
+    cym = iwrap(model->ly, cellm->y);    
+    model->numOfNeigh[m] = 0; // Reset the number of neighbours
     
     for (int n = 0; n < m; n++) {
-      pairmn = getPairIndex(m,n);
       celln = model->cells[n];
-      phin = celln->field[celln->getIndex];
       cxn = iwrap(model->lx, celln->x);
       cyn = iwrap(model->ly, celln->y);
-      model->celldx[pairmn] = idiff(model->lx, cxm, cxn);
-      model->celldy[pairmn] = idiff(model->ly, cym, cyn);
-      if (abs(model->celldx[pairmn]) < clxm && 
-	  abs(model->celldy[pairmn]) < clym) {
-	model->overlapInt[pairmn] = 1;
-      } else {
-	model->overlapInt[pairmn] = 0;
+      xdiff = idiff(model->lx, cxm, cxn);
+      ydiff = idiff(model->ly, cym, cyn);
+      // Add cell to neighbour list if there is overlap
+      if (abs(xdiff) < clxm && abs(ydiff) < clym) {
+	neighm = model->numOfNeigh[m];
+	neighn = model->numOfNeigh[n];
+	if (neighm >= PF_MAXNEIGH || neighn >= PF_MAXNEIGH) {
+	  printf("ERROR: neighbour list exceeding the ");
+	  printf("maximum number of neighbours!\n");
+	  exit(1);
+	}
+	model->neighList[m][neighm] = n;
+	model->neighList[n][neighn] = m;
+	model->cellDiffCoord[m][neighm][0] = xdiff;
+	model->cellDiffCoord[m][neighm][1] = ydiff;
+	model->cellDiffCoord[n][neighn][0] = -xdiff;
+	model->cellDiffCoord[n][neighn][1] = -ydiff;
+	model->numOfNeigh[m]++;
+	model->numOfNeigh[n]++;
       }
     }
   }
-  
+    
   // Compute the actual amount of overlap \int dx \phi_i \phi_j
-  int dxmn, dymn, xn, yn;
-  int clxn, clyn;
+  int dxmn, dymn, xm, ym, xn, yn;
+  double olap;
   
 #pragma omp parallel for default(none) shared(model, ncells)	\
-  private(pairmn, cellm, celln, xn, yn, phim, phin)		\
-  private(clxm, clym, clxn, clyn, dxmn, dymn)			\
+  private(cellm, celln, xm, ym, xn, yn, phim, phin)		\
+  private(clxm, clym, dxmn, dymn, olap)				\
   schedule(static)
   for (int m = 0; m < ncells; m++) {
     cellm = model->cells[m];
     phim = cellm->field[cellm->getIndex];
     clxm = cellm->lx;
     clym = cellm->ly;
-    for (int n = 0; n < ncells; n++) {
-      model->overlap[m][n] = 0.0; // Reset it first
-      pairmn = getPairIndex(m,n);
-      if (!model->overlapInt[pairmn]) continue;
-      celln = model->cells[n];
-      clxn = celln->lx;
-      clyn = celln->ly;
-      phin = celln->field[celln->getIndex];
-      dxmn = model->celldx[pairmn];
-      dymn = model->celldy[pairmn];
-      for (int i = 0; i < clxm; i++) {
-	xn = dxmn+i;
-	if (xn < 0 || xn >= clxn) continue;
-	for (int j = 0; j < clym; j++) {
-	  yn = dymn+j;
-	  if (yn < 0 || yn >= clyn) continue;
-	  model->overlap[m][n] += phim[i][j]*phin[xn][yn];
-	}
+    
+    // Compute self overlap
+    olap = 0.0;
+    for (int i = 0; i < clxm; i++) {
+      for (int j = 0; j < clym; j++) {
+	olap += phim[i][j]*phim[i][j];
       }
     }
-    cellm->volume = model->overlap[m][m];
+    model->overlap[m][m] = olap;
+    cellm->volume = olap;
+    
+    // Compute overlap with cells in its neighbour list
+    for (int k = 0; k < model->numOfNeigh[m]; k++) {
+      int n = model->neighList[m][k];
+      olap = 0.0;
+      celln = model->cells[n];
+      phin = celln->field[celln->getIndex];
+      dxmn = model->cellDiffCoord[m][k][0];
+      dymn = model->cellDiffCoord[m][k][1];
+      int xmstart, xnstart, ymstart, ynstart, lenx, leny;
+      // This assumes that clxm = clxn and clym = clyn
+      if (dxmn > 0) {
+	xmstart = 0;
+	xnstart = dxmn;
+	lenx = clxm-dxmn;
+      } else {
+	xmstart = -dxmn;
+	xnstart = 0;
+	lenx = clxm+dxmn;
+      }
+      if (dymn > 0) {
+	ymstart = 0;
+	ynstart = dymn;
+	leny = clym-dymn;
+      } else {
+	ymstart = -dymn;
+	ynstart = 0;
+	leny = clym+dymn;
+      }
+      for (int i = 0; i < lenx; i++) {
+	xm = xmstart+i;
+	xn = xnstart+i;
+	for (int j = 0; j < leny; j++) {
+	  ym = ymstart+j;
+	  yn = ynstart+j;
+	  olap += phim[xm][ym]*phin[xn][yn];
+	}
+      }
+      model->overlap[m][n] = olap;
+    }
   }
 
   // Copy the overlap matrix into a 1D vector (column major format)
@@ -396,52 +423,6 @@ void updateOverlap(PhaseFieldModel* model) {
     for (int n = 0; n <= m; n++) {
       model->overlapMat[n*ncells+m] = model->overlap[m][n];
       model->overlapMat[m*ncells+n] = model->overlap[n][m];
-    }
-  }
-}
-
-void updateCellDeform(PhaseFieldModel* model, Cell* cell) {
-  // Update gradient field and deformation
-  int clx = cell->lx;
-  int cly = cell->ly;
-  double** cellField = cell->field[cell->getIndex];
-  double gphix, gphiy, gphi2, gxsxx, gxsxy, gysxy, gysyy;
-  int iu, iuu, id, idd, ju, juu, jd, jdd;
-  for (int i = 2; i < clx-2; i++) {
-    iu = iup(clx, i);
-    iuu = iup(clx, iu);
-    id = idown(clx, i);
-    idd = idown(clx, id);
-    for (int j = 2; j < cly-2; j++) {
-      ju = iup(cly, j);
-      juu = iup(cly, ju);
-      jd = idown(cly, j);
-      jdd = idown(cly, jd);
-      gphix = grad4(i, j, iuu, iu, id, idd, 0, cellField);
-      gphiy = grad4(i, j, juu, ju, jd, jdd, 1, cellField);
-      gphi2 = gphix*gphix+gphiy*gphiy;
-      cell->deform[0][i][j] = gphix*gphix-gphi2/2.0; // Sxx
-      cell->deform[1][i][j] = gphiy*gphiy-gphi2/2.0; // Syy
-      cell->deform[2][i][j] = gphix*gphiy;           // Sxy
-    }
-  }
-  // Compute divergence of deformation tensor
-  for (int i = 2; i < clx-2; i++) {
-    iu = iup(clx, i);
-    iuu = iup(clx, iu);
-    id = idown(clx, i);
-    idd = idown(clx, id);
-    for (int j = 2; j < cly-2; j++) {
-      ju = iup(cly, j);
-      juu = iup(cly, ju);
-      jd = idown(cly, j);
-      jdd = idown(cly, jd);
-      gxsxx = grad4(i, j, iuu, iu, id, idd, 0, cell->deform[0]);
-      gxsxy = grad4(i, j, iuu, iu, id, idd, 0, cell->deform[1]);
-      gysxy = grad4(i, j, juu, ju, jd, jdd, 1, cell->deform[1]);
-      gysyy = grad4(i, j, juu, ju, jd, jdd, 1, cell->deform[2]);
-      cell->divDeform[0][i][j] = gxsxx+gysxy;
-      cell->divDeform[1][i][j] = gxsxy+gysyy;
     }
   }
 }
@@ -459,12 +440,7 @@ void updateCellChemPotAndDeform(PhaseFieldModel* model, Cell* cell, int m) {
   double cahnHilliard, surfaceTension, volumeConst, repulsion, adhesion;
   // Need to update overlap first
   double vol = model->overlap[m][m] / model->piR2phi02;
-  double** mu = cell->chemPot;
-  double** gmux = cell->gradChemPot[0];
-  double** gmuy = cell->gradChemPot[1];
-  double** gsx = cell->divDeform[0];
-  double** gsy = cell->divDeform[1];
-
+  
   // Apply fixed (Dirichlet) boundary conditions (phi = 0 at boundaries)
   // i and j are coordinates in the cell's own reference frame
   for (int i = 2; i < clx-2; i++) {
@@ -486,8 +462,8 @@ void updateCellChemPotAndDeform(PhaseFieldModel* model, Cell* cell, int m) {
 
       // Store the divergence of the deformation tensor
       // This is a shortcut that only works in 2D!
-      gsx[i][j] = gphix*g2phi;
-      gsy[i][j] = gphiy*g2phi;
+      cell->divDeform[i][j][0] = gphix*g2phi;
+      cell->divDeform[i][j][1] = gphiy*g2phi;
 
       // Cahn-Hilliard term
       cahnHilliard = model->cahnHilliardCoeff * phi * (phi - model->phi0) * 
@@ -508,7 +484,7 @@ void updateCellChemPotAndDeform(PhaseFieldModel* model, Cell* cell, int m) {
 	(g2phi - model->laplaceTotalField[x][y]);
       
       // Store chemical potential
-      mu[i][j] = cahnHilliard + surfaceTension + volumeConst + 
+      cell->chemPot[i][j] = cahnHilliard + surfaceTension + volumeConst + 
 	repulsion + adhesion;
     }
   }
@@ -524,8 +500,10 @@ void updateCellChemPotAndDeform(PhaseFieldModel* model, Cell* cell, int m) {
       juu = iup(cly, ju);
       jd = idown(cly, j);
       jdd = idown(cly, jd);
-      gmux[i][j] = grad4(i, j, iuu, iu, id, idd, 0, mu);
-      gmuy[i][j] = grad4(i, j, juu, ju, jd, jdd, 1, mu);
+      cell->gradChemPot[i][j][0] = 
+	grad4(i, j, iuu, iu, id, idd, 0, cell->chemPot);
+      cell->gradChemPot[i][j][1] = 
+	grad4(i, j, juu, ju, jd, jdd, 1, cell->chemPot);
     }
   }
 }
@@ -559,11 +537,11 @@ void updateCellForces(PhaseFieldModel* model, Cell* cell, int m) {
     for (int j = 0; j < cly; j++) {
       y = iwrap(model->ly, cy+j);
       phi = cellField[i][j];
-      cap[0] += phi*model->totalCapillField[0][x][y];
-      cap[1] += phi*model->totalCapillField[1][x][y];
+      cap[0] += phi*model->totalCapillField[x][y][0];
+      cap[1] += phi*model->totalCapillField[x][y][1];
       if (model->activeShearCoeff > 0.0) {
-	act[0] += phi*model->totalDeformField[0][x][y];
-	act[1] += phi*model->totalDeformField[1][x][y];
+	act[0] += phi*model->totalDeformField[x][y][0];
+	act[1] += phi*model->totalDeformField[x][y][1];
       }
     }
   }
@@ -647,8 +625,4 @@ void updateCellCM(PhaseFieldModel* model, Cell* cell, int cellIndex) {
   model->cellYCM[cellIndex] = y - iy * model->ly;
   model->cellXBoundCount[cellIndex] = ix;
   model->cellYBoundCount[cellIndex] = iy;
-}
-
-inline int getPairIndex(int m, int n) {
-  return m > n ? m*(m+1)/2+n : n*(n+1)/2+m;
 }

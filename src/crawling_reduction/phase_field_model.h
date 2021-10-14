@@ -34,16 +34,19 @@ typedef struct PhaseFieldModel {
   double** totalField;
   double** totalFieldSq;
   double** laplaceTotalField;
-  double** totalCapillField[2];
-  double** totalDeformField[2]; // Traceless, active part
+  double*** totalCapillField;
+  double*** totalDeformField; // Traceless, active part
 
   // Dumps
   Dump** dumps;
   int ndumps;
 
-  int* celldx; // Difference between top coordinates of cells in x
-  int* celldy; // Difference between top coordinates of cells in y
-  int* overlapInt; // Indicator if there is overlap or not
+  //int* celldx; // Difference between top coordinates of cells in x
+  //int* celldy; // Difference between top coordinates of cells in y 
+  int* numOfNeigh; // Number of neighbours of each cell
+  int** neighList; // Store a list of overlapping neighbours of each cell
+  int*** cellDiffCoord; // Difference between top coordinates for neighbours
+  //int* overlapInt; // Indicator if there is overlap or not
   double** overlap; // Actual overlap matrix (symmetric)
   double** capillForce; // Capillary force
   double** activeForce; // Active deviatoric force
@@ -69,14 +72,10 @@ void updateTotalField(PhaseFieldModel* model);
 void updateTotalCapillDeformField(PhaseFieldModel* model);
 void updateOverlap(PhaseFieldModel* model);
 void updateVelocity(PhaseFieldModel* model);
-void updateCellDeform(PhaseFieldModel* model, Cell* cell);
 void updateCellChemPotAndDeform(PhaseFieldModel* model, Cell* cell, int m);
-//void updateCellVolume(PhaseFieldModel* model, Cell* cell);
 void updateCellPolarity(PhaseFieldModel* model, Cell* cell, int m);
 void updateCellForces(PhaseFieldModel* model, Cell* cell, int m);
 void updateCellField(PhaseFieldModel* model, Cell* cell);
 void updateCellCM(PhaseFieldModel* model, Cell* cell, int cellIndex);
-
-int getPairIndex(int m, int n);
 
 #endif
