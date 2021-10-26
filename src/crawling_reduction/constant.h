@@ -19,9 +19,4 @@
 #define PF_OLAPTHRES 0.1
 #endif
 
-// Maximum number of neighbours per cell for neighbour list
-#ifndef PF_MAXNEIGH
-#define PF_MAXNEIGH 50
-#endif
-
 #endif

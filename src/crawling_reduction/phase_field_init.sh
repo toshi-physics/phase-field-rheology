@@ -1,23 +1,24 @@
 #!/bin/bash
-# init_phase_field_model.sh
+# phase_field_init.sh
 
-if [[ $# != 5 ]]; then
-    echo "Usage: phase_field_init.sh deform peclet align run run_dir"
+# Directory of this script
+sh_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
+
+if (( $# != 4 )); then
+    echo "Usage: phase_field_init.sh deform peclet run run_dir"
     exit 1
 fi
 
 deform=$1    # Deformability (d = epsilon/alpha)
 peclet=$2    # Peclet number (Pe = v/(R*Dr))
-align=$3     # Ratio of alignment rate to Dr
-run=$4       # Trial number
-run_dir=$5   # Run directory
+run=$3       # Trial number
+run_dir=$4   # Run directory
 
 pyx=python3 # Choose between python2 and python3
 
 # Format input params
 deform=$($pyx -c "print('{:.3f}'.format($deform))")
 peclet=$($pyx -c "print('{:.3f}'.format($peclet))")
-align=$($pyx -c "print('{:.3f}'.format($align))")
 
 # A function for generating random numbers
 max_seed=1000000
@@ -36,13 +37,15 @@ init_radius=7.0 # 7.0
 ideal_radius=12.0 # 12.0
 cell_lx=41 # 41
 cell_ly=41 # 41
-phi0=2.0 # 2.0
-mu=100.0 # 6000.0
+phi0=1.0 # 1.0
+lambda=1.0 # 1.0 (rougly 1800 in the old model)
 epsilon=0.1 # 0.1
+omega=0.1 # 0.1
+kappa_active=0.1 # 0.1 active shear stress
 rotate_diff=0.0001 # 0.0001
-relax_rate=0.1 # 0.1
-align_type=1.0 # 1.0 for polar, 2.0 for apolar
-align_rate=$($pyx -c "print($align*$rotate_diff)") # 0.1
+friction=1.0 # 1.0
+mobility=0.1 # 0.1
+overlap=1 # Do overlap calculation or not
 
 nsteps=21000000 # 20000000 # Add another 10^6 steps for equilibration
 nequil=10000 # 10000
@@ -68,7 +71,7 @@ equildump_field_freq=10000 # 10000
 seed=$(get_rand)
 
 # Set alpha based on deformability
-alpha=$($pyx -c "print('{:f}'.format($epsilon/$deform))")
+alpha=$($pyx -c "print('{:f}'.format(1.5*$epsilon/$deform))")
 kappa=$($pyx -c "print('{:f}'.format($alpha*2.0))")
 
 # Set motility based on Peclet number, rotatioal diff, and ideal radius
@@ -90,7 +93,7 @@ ly=$(echo $size | awk '{print $6}')
 python cell_shape.py $cell_lx $cell_ly $phi0 $tmp_shape_file circle $init_radius
 
 # Create run directory and set file names
-sim_name="cell_N_${ncells}_d_${deform}_Pe_${peclet}_a_${align}_run_${run}"
+sim_name="cell_N_${ncells}_d_${deform}_Pe_${peclet}_run_${run}"
 run_dir="${run_dir}/${sim_name}/"
 
 if [ ! -d $run_dir ]; then
@@ -127,27 +130,29 @@ mv $tmp_shape_file ${run_dir}/$shape_file
 # Replace macros in template with input values
 echo \
 "phi0 = ${phi0}
-M = ${relax_rate}
-R = ${ideal_radius}
-kappa = ${kappa}
-alpha = ${alpha}
-mu = ${mu}
-Dr = ${rotate_diff}
-epsilon = ${epsilon}
+cellRadius = ${ideal_radius}
+cahnHilliardCoeff = ${alpha}
+surfaceTensionCoeff = ${kappa}
+volumePenaltyCoeff = ${lambda}
+repulsionCoeff = ${epsilon}
+adhesionCoeff = ${omega}
+frictionCoeff = ${friction}
+activeShearCoeff = ${kappa_active}
+diffusionCoeff = ${rotate_diff}
 cellLx = ${cell_lx}
 cellLy = ${cell_ly}
 lx = ${lx}
 ly = ${ly}
-ncells = ${ncells}
 nsteps = ${nsteps}
 nequil = ${nequil}
+ncells = ${ncells}
 dt = ${delta_t}
-v = ${motility}
-seed = ${seed}
+mobility = ${mobility}
+motility = ${motility}
 cm_file = ${cm_file}
 shape_file = ${shape_file}
-align_type = ${align_type}
-align_rate = ${align_rate}
+seed = ${seed}
+overlap = ${overlap}
 " > $params_file
 
 # Set dumps
@@ -161,12 +166,12 @@ function add_dump() {
 #add_dump "dump_gyr $equildump_gyr_freq 0 equil" $equildump_gyr_file
 #add_dump "dump_field $equildump_field_freq 0 equil" $equildump_field_file
 add_dump "dump_cm $dump_cm_freq 0 main" $dump_cm_file
-add_dump "dump_gyr $dump_gyr_freq 0 main" $dump_gyr_file
-add_dump "dump_gyr_field $dump_gyr_field_freq 0 main" $dump_gyr_field_file
-add_dump "dump_vel $dump_vel_freq 0 main" $dump_vel_file
-add_dump "dump_vel_field $dump_vel_field_freq 0 main" $dump_vel_field_file
-add_dump "dump_deform $dump_deform_freq 0 main" $dump_deform_file
-add_dump "dump_deform_field $dump_deform_field_freq 0 main" $dump_deform_field_file
+#add_dump "dump_gyr $dump_gyr_freq 0 main" $dump_gyr_file
+#add_dump "dump_gyr_field $dump_gyr_field_freq 0 main" $dump_gyr_field_file
+#add_dump "dump_vel $dump_vel_freq 0 main" $dump_vel_file
+#add_dump "dump_vel_field $dump_vel_field_freq 0 main" $dump_vel_field_file
+#add_dump "dump_deform $dump_deform_freq 0 main" $dump_deform_file
+#add_dump "dump_deform_field $dump_deform_field_freq 0 main" $dump_deform_field_file
 add_dump "dump_field $dump_field_freq 0 main" $dump_field_file
 #add_dump "dump_index_field $dump_index_field_freq 0 main" $dump_index_field_file
 add_dump "dump_bulk_cm $dump_bulk_cm_freq main" $dump_bulk_cm_file

@@ -28,6 +28,7 @@ PhaseFieldModel* createModel(int lx, int ly, int ncells) {
   model->volumePenaltyCoeff = 0.0;
   model->repulsionCoeff = 0.0;
   model->adhesionCoeff = 0.0;
+  model->frictionCoeff = 1.0;
   model->diffusionCoeff = 0.0;
   model->activeShearCoeff = 0.0;
   model->mobility = 1.0;
@@ -46,16 +47,13 @@ PhaseFieldModel* createModel(int lx, int ly, int ncells) {
   model->cellYBoundCount = create1DIntArray(ncells);
   model->dumps = NULL;
   model->ndumps = 0;
-  model->numOfNeigh = create1DIntArray(ncells);
-  model->neighList = create2DIntArray(ncells, PF_MAXNEIGH);
-  model->cellDiffCoord = create3DIntArray(ncells, PF_MAXNEIGH, 3);  
-  model->overlap = create2DDoubleArray(ncells, ncells);
   model->overlapMat = create1DDoubleArray(ncells*ncells);
   model->capillForce = create2DDoubleArray(ncells, 2);
   model->activeForce = create2DDoubleArray(ncells, 2);
   model->polarForce = create1DDoubleArray(ncells*2);
   model->totalForce = create1DDoubleArray(ncells*2);
   model->solvedVelocity = create1DDoubleArray(ncells*2);
+  model->doOverlap = 1; // Enable overlap calculation by default
   return model; 
 }
 
@@ -75,10 +73,6 @@ void deleteModel(PhaseFieldModel* model) {
   free(model->cellYCM);
   free(model->cellXBoundCount);
   free(model->cellYBoundCount);
-  free(model->numOfNeigh);
-  free(model->neighList);
-  free(model->cellDiffCoord);
-  free(model->overlap);
   free(model->overlapMat);
   free(model->capillForce);
   free(model->activeForce);
@@ -166,39 +160,26 @@ void initCellsFromFile(PhaseFieldModel* model, char* cmFile,
 void run(PhaseFieldModel* model, int nsteps) {
   output(model, 0); // Output initial state of the model
   for (int n = 1; n <= nsteps; n++) {
-    // Update the total field
-    //printf("Total field ...\n");
     updateTotalField(model);
-
-    // Check which subdomains are overlapped
-    //printf("Overlap ...\n");
     updateOverlap(model);
 
-    // Update each cell field
-    //printf("Cell field ...\n");
 #pragma omp parallel for default(none) shared(model) schedule(static)
     for (int m = 0; m < model->numOfCells; m++) {
       Cell* cell = model->cells[m];
-      //printf("%d Cell polarity ...\n", m);
       updateCellPolarity(model, cell, m);
-      //printf("%d Cell chem pot and deform ...\n", m);
       updateCellChemPotAndDeform(model, cell, m);
     }
     
-    //printf("Total capillary and deform fields ...\n");
     updateTotalCapillDeformField(model);
     
-    //printf("Cell forces ...\n");
 #pragma omp parallel for default(none) shared(model) schedule(static)
     for (int m = 0; m < model->numOfCells; m++) {
       Cell* cell = model->cells[m];
       updateCellForces(model, cell, m);
     }
     
-    //printf("Velocity ...\n");
     updateVelocity(model);
 
-    //printf("Cell field ...\n");
 #pragma omp parallel for default(none) shared(model) schedule(static)
     for (int m = 0; m < model->numOfCells; m++) {
       Cell* cell = model->cells[m];
@@ -308,121 +289,103 @@ void updateTotalCapillDeformField(PhaseFieldModel* model) {
 
 void updateOverlap(PhaseFieldModel* model) {
   Cell* cellm;
-  Cell* celln;
-  int clxm, clym, cxm, cym, cxn, cyn;
-  int xdiff, ydiff;
-  int neighm, neighn;
-  double** phim;
-  double** phin;
   int ncells = model->numOfCells;
-  
-  // Check which subdomains overlap with one another
-  // This is essentially a neighbour list for each cell
-  for (int m = 0; m < ncells; m++) {
-    cellm = model->cells[m];
-    clxm = cellm->lx;
-    clym = cellm->ly;
-    cxm = iwrap(model->lx, cellm->x);
-    cym = iwrap(model->ly, cellm->y);    
-    model->numOfNeigh[m] = 0; // Reset the number of neighbours
-    
-    for (int n = 0; n < m; n++) {
-      celln = model->cells[n];
-      cxn = iwrap(model->lx, celln->x);
-      cyn = iwrap(model->ly, celln->y);
-      xdiff = idiff(model->lx, cxm, cxn);
-      ydiff = idiff(model->ly, cym, cyn);
-      // Add cell to neighbour list if there is overlap
-      if (abs(xdiff) < clxm && abs(ydiff) < clym) {
-	neighm = model->numOfNeigh[m];
-	neighn = model->numOfNeigh[n];
-	if (neighm >= PF_MAXNEIGH || neighn >= PF_MAXNEIGH) {
-	  printf("ERROR: neighbour list exceeding the ");
-	  printf("maximum number of neighbours!\n");
-	  exit(1);
-	}
-	model->neighList[m][neighm] = n;
-	model->neighList[n][neighn] = m;
-	model->cellDiffCoord[m][neighm][0] = xdiff;
-	model->cellDiffCoord[m][neighm][1] = ydiff;
-	model->cellDiffCoord[n][neighn][0] = -xdiff;
-	model->cellDiffCoord[n][neighn][1] = -ydiff;
-	model->numOfNeigh[m]++;
-	model->numOfNeigh[n]++;
-      }
-    }
-  }
-    
-  // Compute the actual amount of overlap \int dx \phi_i \phi_j
-  int dxmn, dymn, xm, ym, xn, yn;
+  double** phim;
   double olap;
+  int clxm, clym;
   
-#pragma omp parallel for default(none) shared(model, ncells)	\
-  private(cellm, celln, xm, ym, xn, yn, phim, phin)		\
-  private(clxm, clym, dxmn, dymn, olap)				\
-  schedule(static)
-  for (int m = 0; m < ncells; m++) {
-    cellm = model->cells[m];
-    phim = cellm->field[cellm->getIndex];
-    clxm = cellm->lx;
-    clym = cellm->ly;
-    
-    // Compute self overlap
-    olap = 0.0;
-    for (int i = 0; i < clxm; i++) {
-      for (int j = 0; j < clym; j++) {
-	olap += phim[i][j]*phim[i][j];
-      }
+  if (model->doOverlap) {
+    Cell* celln;
+    int cxm, cym, cxn, cyn, dxmn, dymn;
+    double** phin;
+    // Reset the overlap matrix
+    // This is LU factorised after each inversion, so must be reset
+#pragma omp parallel for default(none) shared(model, ncells) schedule(static)
+    for (int m = 0; m < ncells*ncells; m++) {
+      model->overlapMat[m] = 0.0;
     }
-    model->overlap[m][m] = olap;
-    cellm->volume = olap;
     
-    // Compute overlap with cells in its neighbour list
-    for (int k = 0; k < model->numOfNeigh[m]; k++) {
-      int n = model->neighList[m][k];
+    // Compute the actual amount of overlap \int dx \phi_i \phi_j
+#pragma omp parallel for default(none) shared(model, ncells)	    \
+  private(cellm, celln, phim, phin, clxm, clym, cxm, cym, cxn, cyn) \
+  private(dxmn, dymn, olap) schedule(dynamic, 4)
+    for (int m = 0; m < ncells; m++) {
+      cellm = model->cells[m];
+      phim = cellm->field[cellm->getIndex];
+      clxm = cellm->lx;
+      clym = cellm->ly;
+      cxm = iwrap(model->lx, cellm->x);
+      cym = iwrap(model->ly, cellm->y);
+      
+      // Compute self overlap
       olap = 0.0;
-      celln = model->cells[n];
-      phin = celln->field[celln->getIndex];
-      dxmn = model->cellDiffCoord[m][k][0];
-      dymn = model->cellDiffCoord[m][k][1];
-      int xmstart, xnstart, ymstart, ynstart, lenx, leny;
-      // This assumes that clxm = clxn and clym = clyn
-      if (dxmn > 0) {
-	xmstart = 0;
-	xnstart = dxmn;
-	lenx = clxm-dxmn;
-      } else {
-	xmstart = -dxmn;
-	xnstart = 0;
-	lenx = clxm+dxmn;
-      }
-      if (dymn > 0) {
-	ymstart = 0;
-	ynstart = dymn;
-	leny = clym-dymn;
-      } else {
-	ymstart = -dymn;
-	ynstart = 0;
-	leny = clym+dymn;
-      }
-      for (int i = 0; i < lenx; i++) {
-	xm = xmstart+i;
-	xn = xnstart+i;
-	for (int j = 0; j < leny; j++) {
-	  ym = ymstart+j;
-	  yn = ynstart+j;
-	  olap += phim[xm][ym]*phin[xn][yn];
+      for (int i = 0; i < clxm; i++) {
+	for (int j = 0; j < clym; j++) {
+	  olap += phim[i][j]*phim[i][j];
 	}
       }
-      model->overlap[m][n] = olap;
-    }
-  }
-
-  // Copy the overlap matrix into a 1D vector (column major format)
-  for (int m = 0; m < ncells; m++) {
-    for (int n = 0; n <= m; n++) {
-      model->overlapMat[n*ncells+m] = model->overlap[m][n];
-      model->overlapMat[m*ncells+n] = model->overlap[n][m];
+      model->overlapMat[m*ncells+m] = olap;
+      cellm->volume = olap;
+      
+      for (int n = 0; n < m; n++) {
+	celln = model->cells[n];
+	cxn = iwrap(model->lx, celln->x);
+	cyn = iwrap(model->ly, celln->y);
+	dxmn = idiff(model->lx, cxm, cxn);
+	dymn = idiff(model->ly, cym, cyn);
+	// They do overlap
+	if (abs(dxmn) < clxm && abs(dymn) < clym) {
+	  phin = celln->field[celln->getIndex];
+	  int xmstart, xnstart, ymstart, ynstart, lenx, leny, xm, ym, xn, yn;
+	  // This assumes that clxm = clxn and clym = clyn
+	  if (dxmn > 0) {
+	    xmstart = 0;
+	    xnstart = dxmn;
+	    lenx = clxm-dxmn;
+	  } else {
+	    xmstart = -dxmn;
+	    xnstart = 0;
+	    lenx = clxm+dxmn;
+	  }
+	  if (dymn > 0) {
+	    ymstart = 0;
+	    ynstart = dymn;
+	    leny = clym-dymn;
+	  } else {
+	    ymstart = -dymn;
+	    ynstart = 0;
+	    leny = clym+dymn;
+	  }
+	  olap = 0.0;
+	  for (int i = 0; i < lenx; i++) {
+	    xm = xmstart+i;
+	    xn = xnstart+i;
+	    for (int j = 0; j < leny; j++) {
+	      ym = ymstart+j;
+	      yn = ynstart+j;
+	      olap += phim[xm][ym]*phin[xn][yn];
+	    }
+	  }
+	  model->overlapMat[m*ncells+n] = olap;
+	  model->overlapMat[n*ncells+m] = olap;
+	}
+      } // Close loop over cell n
+    } // Close loop over cell m
+  } else { // Don't do overlap - just update cell volume (i.e., self overlap)
+#pragma omp parallel for default(none) shared(model, ncells) \
+  private(cellm, phim, clxm, clym, olap) schedule(static)
+    for (int m = 0; m < ncells; m++) {
+      cellm = model->cells[m];
+      clxm = cellm->lx;
+      clym = cellm->ly;
+      phim = cellm->field[cellm->getIndex];
+      olap = 0.0;
+      for (int i = 0; i < clxm; i++) {
+	for (int j = 0; j < clym; j++) {
+	  olap += phim[i][j]*phim[i][j];
+	}
+      }
+      cellm->volume = olap;
     }
   }
 }
@@ -439,7 +402,7 @@ void updateCellChemPotAndDeform(PhaseFieldModel* model, Cell* cell, int m) {
   double phi, gphix, gphiy, g2phi;
   double cahnHilliard, surfaceTension, volumeConst, repulsion, adhesion;
   // Need to update overlap first
-  double vol = model->overlap[m][m] / model->piR2phi02;
+  double vol = cell->volume / model->piR2phi02;
   
   // Apply fixed (Dirichlet) boundary conditions (phi = 0 at boundaries)
   // i and j are coordinates in the cell's own reference frame
@@ -548,30 +511,45 @@ void updateCellForces(PhaseFieldModel* model, Cell* cell, int m) {
   // Total force
   int mx = m;
   int my = m+model->numOfCells;
-  tot[mx] = cap[0] + model->activeShearCoeff*act[0];
-  tot[my] = cap[1] + model->activeShearCoeff*act[1];
+  tot[mx] = (cap[0] + model->activeShearCoeff*act[0]) / model->frictionCoeff;
+  tot[my] = (cap[1] + model->activeShearCoeff*act[1]) / model->frictionCoeff;
 }
 
 void updateVelocity(PhaseFieldModel* model) {
   // This relies cell volume and polarity being up-to-date,
   // so update them first!
   int ncells = model->numOfCells;
-  ammpbm(model->overlapMat, model->polarForce, model->totalForce, 
-	 model->motility, 1.0, ncells, 2);
-  solver(model->overlapMat, model->totalForce, model->solvedVelocity, 
-	 ncells, 2, 0);
   Cell* cell;
   int mx, my;
   double cvx, cvy;
-  for (int m = 0; m < ncells; m++) {
-    mx = m;
-    my = m+ncells;
-    cell = model->cells[m];
-    cvx = model->solvedVelocity[mx];
-    cvy = model->solvedVelocity[my];
-    cell->vx = cvx;
-    cell->vy = cvy;
-    cell->v = sqrt(cvx*cvx+cvy*cvy);
+  if (model->doOverlap) { // Do matrix inversion when overlap is enabled
+    ammpbm(model->overlapMat, model->polarForce, model->totalForce, 
+	   model->motility, 1.0, ncells, 2);
+    solver(model->overlapMat, model->totalForce, model->solvedVelocity, 
+	   ncells, 2, 0);
+    for (int m = 0; m < ncells; m++) {
+      mx = m;
+      my = m+ncells;
+      cell = model->cells[m];
+      cvx = model->solvedVelocity[mx];
+      cvy = model->solvedVelocity[my];
+      cell->vx = cvx;
+      cell->vy = cvy;
+      cell->v = sqrt(cvx*cvx+cvy*cvy);
+    }
+  } else { // Do simple division by cell volume
+    for (int m = 0; m < ncells; m++) {
+      mx = m;
+      my = m+ncells;
+      cell = model->cells[m];
+      cvx = model->motility * model->polarForce[mx] + 
+	model->totalForce[mx] / cell->volume;
+      cvx = model->motility * model->polarForce[my] + 
+	model->totalForce[my] / cell->volume;
+      cell->vx = cvx;
+      cell->vy = cvy;
+      cell->v = sqrt(cvx*cvx+cvy*cvy);
+    }
   }
 }
 

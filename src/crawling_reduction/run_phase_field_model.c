@@ -32,8 +32,8 @@ int main (int argc, char* argv[]) {
   char cmFile [PF_DIR_SIZE], shapeFile [PF_DIR_SIZE], dumpFile [PF_DIR_SIZE];
   double phi0 = -1.0;
   double mobility, cellRadius, dt, motility;
-  double surfaceTensionCoeff, cahnHilliardCoeff, volumePenaltyCoeff,
-    repulsionCoeff, adhesionCoeff, activeShearCoeff, diffusionCoeff;
+  double surfaceTensionCoeff, cahnHilliardCoeff, repulsionCoeff, adhesionCoeff,
+    volumePenaltyCoeff, frictionCoeff, activeShearCoeff, diffusionCoeff;
   int cellLx = -1;
   int cellLy = -1;
   int lx = -1;
@@ -45,6 +45,7 @@ int main (int argc, char* argv[]) {
   int nedumps = 0;
   int maxDumps = 1000;
   int printInc, overwrite, cellIndex;
+  int overlap;
   
 #if PF_HAS_ARMA
   int fieldScale, kernelLength, sgolayDegree, sgolayLength;
@@ -54,15 +55,16 @@ int main (int argc, char* argv[]) {
   Dump** dumps = malloc(sizeof *dumps * maxDumps);
 
   while (fgets(line, sizeof(line), file) != NULL) {
-    nparams += sscanf(line, "alpha = %lf", &cahnHilliardCoeff);
     nparams += sscanf(line, "phi0 = %lf", &phi0);
-    nparams += sscanf(line, "R = %lf", &cellRadius);
-    nparams += sscanf(line, "kappa = %lf", &surfaceTensionCoeff);
-    nparams += sscanf(line, "mu = %lf", &volumePenaltyCoeff);
-    nparams += sscanf(line, "epsilon = %lf", &repulsionCoeff);
-    nparams += sscanf(line, "omega = %lf", &adhesionCoeff);
-    nparams += sscanf(line, "kappaActive = %lf", &activeShearCoeff);
-    nparams += sscanf(line, "Dr = %lf", &diffusionCoeff);
+    nparams += sscanf(line, "cellRadius = %lf", &cellRadius);
+    nparams += sscanf(line, "cahnHilliardCoeff = %lf", &cahnHilliardCoeff);
+    nparams += sscanf(line, "surfaceTensionCoeff = %lf", &surfaceTensionCoeff);
+    nparams += sscanf(line, "volumePenaltyCoeff = %lf", &volumePenaltyCoeff);
+    nparams += sscanf(line, "repulsionCoeff = %lf", &repulsionCoeff);
+    nparams += sscanf(line, "adhesionCoeff = %lf", &adhesionCoeff);
+    nparams += sscanf(line, "frictionCoeff = %lf", &frictionCoeff);
+    nparams += sscanf(line, "activeShearCoeff = %lf", &activeShearCoeff);
+    nparams += sscanf(line, "diffusionCoeff = %lf", &diffusionCoeff);
     nparams += sscanf(line, "cellLx = %d", &cellLx);
     nparams += sscanf(line, "cellLy = %d", &cellLy);
     nparams += sscanf(line, "lx = %d", &lx);
@@ -71,11 +73,12 @@ int main (int argc, char* argv[]) {
     nparams += sscanf(line, "nequil = %d", &nequil);
     nparams += sscanf(line, "ncells = %d", &ncells);
     nparams += sscanf(line, "dt = %lf", &dt);
-    nparams += sscanf(line, "M = %lf", &mobility);
-    nparams += sscanf(line, "v = %lf", &motility);
+    nparams += sscanf(line, "mobility = %lf", &mobility);
+    nparams += sscanf(line, "motility = %lf", &motility);
     nparams += sscanf(line, "cm_file = %s", cmFile);
     nparams += sscanf(line, "shape_file = %s", shapeFile);
     nparams += sscanf(line, "seed = %ld", &seed);
+    nparams += sscanf(line, "overlap = %d", &overlap);
     
     // Read dumps
     // CM dump
@@ -309,7 +312,7 @@ int main (int argc, char* argv[]) {
 
   fclose(file);
   
-  if (nparams != 22) {
+  if (nparams != 24) {
     printf("Not enough parameters specified!\n");
     return 1;
   }  
@@ -325,6 +328,7 @@ int main (int argc, char* argv[]) {
   printf("surfaceTensionCoeff = %.5f\n", surfaceTensionCoeff);
   printf("repulsionCoeff = %.5f\n", repulsionCoeff);
   printf("adhesionCoeff = %.5f\n", adhesionCoeff);
+  printf("frictionCoeff = %.5f\n", frictionCoeff);
   printf("activeShearCoeff = %.5f\n", activeShearCoeff);
   printf("diffusionCoeff = %.5f\n", diffusionCoeff);
   printf("dt = %.5f\n", dt);
@@ -336,7 +340,7 @@ int main (int argc, char* argv[]) {
   printf("shape_file = %s\n", shapeFile);  
   printf("nsteps = %d\n", nsteps);
   printf("nequil = %d\n", nequil);
-    
+  printf("overlap = %d\n", overlap);
 
   printf("Initialising model ...\n");
   
@@ -350,12 +354,14 @@ int main (int argc, char* argv[]) {
   model->diffusionCoeff = diffusionCoeff;
   model->repulsionCoeff = repulsionCoeff;
   model->adhesionCoeff = adhesionCoeff;
+  model->frictionCoeff = frictionCoeff;
   model->activeShearCoeff = activeShearCoeff;
   model->motility = 0.0;
   model->cellLx = cellLx;
   model->cellLy = cellLy;
   model->ndumps = nedumps;
   model->dumps = equilDumps;
+  model->doOverlap = overlap;
   
   initCellsFromFile(model, cmFile, shapeFile, seed);
   

@@ -2,20 +2,20 @@
 # CC := gcc
 # CC := gcc-10
 CC := $(CC)
-CFLAGS := -Wall -Wshadow -Winline -O3 -std=c11 -fopenmp -flto
+CFLAGS := -Wall -Wshadow -Winline -O3 -std=c11 -fopenmp -flto -g
 #CFLAGS := -Wall -Wshadow -Winline -O3 -std=c11
 
 # CXX := g++
 # CXX := g++-10
 CXX := $(CXX)
-CXXFLAGS := -Wall -Wshadow -Winline -O3 -std=c++11 -flto
+CXXFLAGS := -Wall -Wshadow -Winline -O3 -std=c++11 -flto -g
 
 SHELL := /bin/bash
 BIN := ../../bin/crawling_reduction/
 LDIR := ../../lib/
 CONDA_DIR := /home/s1309877/.local/bin/miniconda3/envs/myUtil/
 INC :=  -I$(CONDA_DIR)/include/ -I$(LDIR)/
-LFLAGS := -L$(CONDA_DIR)/lib/ -lm -lgomp -flto -O3 -llapack -lblas
+LFLAGS := -L$(CONDA_DIR)/lib/ -lm -lgomp -flto -O3 -llapack -lblas -g
 
 PRG_SUFFIX_FLAG := 0
 PRG_SUFFIX =

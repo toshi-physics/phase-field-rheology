@@ -22,6 +22,7 @@ typedef struct PhaseFieldModel {
   double motility;
   double activeShearCoeff;
   double adhesionCoeff;
+  double frictionCoeff;
   int cellLx;
   int cellLy;
   double* cellXCM;
@@ -40,18 +41,12 @@ typedef struct PhaseFieldModel {
   // Dumps
   Dump** dumps;
   int ndumps;
-
-  //int* celldx; // Difference between top coordinates of cells in x
-  //int* celldy; // Difference between top coordinates of cells in y 
-  int* numOfNeigh; // Number of neighbours of each cell
-  int** neighList; // Store a list of overlapping neighbours of each cell
-  int*** cellDiffCoord; // Difference between top coordinates for neighbours
-  //int* overlapInt; // Indicator if there is overlap or not
-  double** overlap; // Actual overlap matrix (symmetric)
+  
   double** capillForce; // Capillary force
   double** activeForce; // Active deviatoric force
   double* polarForce; // Polarity unity vector (in column major format)
   double* totalForce; // Total force (in column major format)
+  int doOverlap; // A switch to turn on or off calculation on overlap
   double* overlapMat; // Overlap matrix (in column major format)
   double* solvedVelocity; // Solved velocity vector for each cell
 } PhaseFieldModel;
