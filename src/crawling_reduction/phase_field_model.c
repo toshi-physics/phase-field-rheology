@@ -544,7 +544,7 @@ void updateVelocity(PhaseFieldModel* model) {
       cell = model->cells[m];
       cvx = model->motility * model->polarForce[mx] + 
 	model->totalForce[mx] / cell->volume;
-      cvx = model->motility * model->polarForce[my] + 
+      cvy = model->motility * model->polarForce[my] + 
 	model->totalForce[my] / cell->volume;
       cell->vx = cvx;
       cell->vy = cvy;
