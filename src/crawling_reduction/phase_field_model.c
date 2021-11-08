@@ -475,8 +475,8 @@ void updateCellPolarity(PhaseFieldModel* model, Cell* cell, int m) {
   // Update polarity due to active rotational diffusion
   cell->theta += sqrt(6.0 * cell->diffusionCoeff * model->dt) * 
     (randDouble(cell->random)*2.0-1.0);
-  model->polarForce[m] = cos(cell->theta);
-  model->polarForce[m+model->numOfCells] = sin(cell->theta);
+  model->polarForce[m] = model->motility * cos(cell->theta);
+  model->polarForce[m+model->numOfCells] = model->motility * sin(cell->theta);
 }
 
 void updateCellForces(PhaseFieldModel* model, Cell* cell, int m) {
@@ -524,7 +524,7 @@ void updateVelocity(PhaseFieldModel* model) {
   double cvx, cvy;
   if (model->doOverlap) { // Do matrix inversion when overlap is enabled
     ammpbm(model->overlapMat, model->polarForce, model->totalForce, 
-	   model->motility, 1.0, ncells, 2);
+	   1.0, 1.0, ncells, ncells, 2);
     solver(model->overlapMat, model->totalForce, model->solvedVelocity, 
 	   ncells, 2, 0);
     for (int m = 0; m < ncells; m++) {
@@ -542,10 +542,8 @@ void updateVelocity(PhaseFieldModel* model) {
       mx = m;
       my = m+ncells;
       cell = model->cells[m];
-      cvx = model->motility * model->polarForce[mx] + 
-	model->totalForce[mx] / cell->volume;
-      cvy = model->motility * model->polarForce[my] + 
-	model->totalForce[my] / cell->volume;
+      cvx = model->polarForce[mx] + model->totalForce[mx] / cell->volume;
+      cvy = model->polarForce[my] + model->totalForce[my] / cell->volume;
       cell->vx = cvx;
       cell->vy = cvy;
       cell->v = sqrt(cvx*cvx+cvy*cvy);

@@ -24,42 +24,39 @@ extern void dgesv_(int* n, int* nrhs, double* a, int* lda, int* ipiv,
 int* createIntMat(int m, int n);
 double* createDoubleMat(int m, int n);
 
-void matvec(double* mat, double* x, double* y, int nr) {
+void matvec(double* mat, double* x, double* y, int nrow, int ncol) {
   char trans = 'N';
-  double alpha = 1.0;
-  double beta = 0.0;
+  double a = 1.0;
+  double b = 0.0;
   int one = 1;
-  dgemv_(&trans, &nr, &nr, &alpha, mat, &nr, x, &one, &beta, y, &one);
+  dgemv_(&trans, &nrow, &ncol, &a, mat, &nrow, x, &one, &b, y, &one);
 }
 
-void matmat(double* mat1, double* mat2, double* mat3, int nr, int nc) {
-  char trans = 'N';
-  double alpha = 1.0;
-  double beta = 0.0;
-  dgemm_(&trans, &trans, &nr, &nc, &nr, &alpha,
-	 mat1, &nr, mat2, &nr, &beta, mat3, &nr);
+void matmat(double* mat1, double* mat2, double* mat3, 
+	    int nrow1, int ncol1, int ncol2) {
+  ammpbm(mat1, mat2, mat3, 1.0, 0.0, nrow1, ncol1, ncol2);
 }
 
 void ammpbm(double* mat1, double* mat2, double* mat3, double a, double b,
-	    int nr, int nc) {
+	    int nrow1, int ncol1, int ncol2) {
   char trans = 'N';
-  dgemm_(&trans, &trans, &nr, &nc, &nr, &a, 
-	 mat1, &nr, mat2, &nr, &b, mat3, &nr);
+  dgemm_(&trans, &trans, &nrow1, &ncol2, &ncol1, &a, 
+	 mat1, &nrow1, mat2, &ncol1, &b, mat3, &nrow1);
 }
 
-void solver(double* mat, double* y, double* x, int nr, int nc, int copy) {
+void solver(double* mat, double* y, double* x, int nrow, int ncol, int copy) {
   // Work with a copy of the matrix to avoid modifying the original matrix
   double* cmat;
   if (copy) {
-    cmat = createDoubleMat(nr, nr);
-    memcpy(cmat, mat, sizeof(double)*nr*nr);
+    cmat = createDoubleMat(nrow, nrow);
+    memcpy(cmat, mat, sizeof(double)*nrow*nrow);
   } else {
     cmat = mat;
   }
-  memcpy(x, y, sizeof(double)*nr*nc);
-  int* ipiv = createIntMat(nr, 1);
+  memcpy(x, y, sizeof(double)*nrow*ncol);
+  int* ipiv = createIntMat(nrow, 1);
   int info = 0;
-  dgesv_(&nr, &nc, cmat, &nr, ipiv, x, &nr, &info);
+  dgesv_(&nrow, &ncol, cmat, &nrow, ipiv, x, &nrow, &info);
   if (copy) {
     free(cmat);
   }
