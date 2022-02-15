@@ -344,14 +344,6 @@ void updateOverlap(Model* model) {
     double** olapTensor = model->overlapTensor;
     double* olapMat = model->overlapMat;
     double* olapVisMat = model->overlapViscousMat;
-    // Reset the overlap matrix
-    // This is LU factorised after each inversion, so must be reset
-    /*#pragma omp parallel for default(none)				\
-  shared(olapMat, olapVisMat, ncells, doViscous) schedule(static)
-    for (int m = 0; m < ncells*ncells*4; m++) {
-      olapMat[m] = 0.0;
-      if (doViscous) olapVisMat[m] = 0.0;
-      }*/
     
     // Compute the actual amount of overlap \int dx \phi_i \phi_j
 #pragma omp parallel for default(none) shared(model, ncells, twoncells) \
@@ -483,7 +475,6 @@ void updateOverlap(Model* model) {
       } // Close loop over cell n
     } // Close loop over cell m (and close parallel region)
     
-    //printf("Done computing viscous and overlap tensor\n");
     // Compute diagonal elements of the viscous tensor
     if (doViscous) {
 #pragma omp parallel for default(none) \
@@ -715,10 +706,6 @@ void updateVelocity(Model* model) {
   if (model->doOverlap || doViscous) {
     ammpbm(model->overlapMat, model->polarForce, model->totalForce, 
 	   1.0, 1.0, twoncells, twoncells, 1);
-    /*printMatrix(model->overlapMat, twoncells, twoncells);
-    printf("\n");
-    printMatrix(model->overlapViscousMat, twoncells, twoncells);
-    printf("\n");*/
     if (doViscous) {
       error = solver(model->overlapViscousMat, model->totalForce, 
 		     model->solvedVelocity, twoncells, 1, 0);
@@ -750,9 +737,7 @@ void updateVelocity(Model* model) {
       cell->vx = cvx;
       cell->vy = cvy;
       cell->v = sqrt(cvx * cvx + cvy * cvy);
-      //printf("%f ", cell->volume);
     }
-    //printf("\n");
   }
 }
 
