@@ -33,6 +33,7 @@ Cell* createCell(int x, int y, int lx, int ly,
   cell->deltaXCM = 0.0;
   cell->deltaYCM = 0.0;
   cell->volume = 0.0;
+  cell->radius = 1.0;
   cell->random = createRandom(seed);
   // pick a random 2D direction
   cell->theta = randDouble(cell->random)*2.0*PF_PI;
@@ -58,7 +59,7 @@ void deleteCell(Cell* cell) {
   free(cell);
 }
 
-void initField(Cell* cell, double** lattice) {
+void setField(Cell* cell, double** lattice) {
   for (int i = 0; i < cell->lx; i++) {
     for (int j = 0; j < cell->ly; j++) {
       cell->field[0][i][j] = lattice[i][j];
@@ -69,11 +70,19 @@ void initField(Cell* cell, double** lattice) {
   updateVolume(cell);
 }
 
-void initFieldSquare(Cell* cell, int x0, int y0, int dx, int dy, double phi0) {
-  for (int i = 0; i < dx && x0+i < cell->lx-1; i++) {
-    for (int j = 0; j < dy && y0+j < cell->ly-1; j++) {
-      cell->field[0][i+x0][j+y0] = phi0;
-      cell->field[1][i+x0][j+y0] = phi0;
+void initCircleField(Cell* cell, double r) {
+  double x0 = cell->lx/2.0;
+  double y0 = cell->ly/2.0;
+  double r2 = r*r;
+  double dx, dy;
+  for (int i = 0; i < cell->lx; i++) {
+    dx = i+0.5-x0;
+    for (int j = 0; j < cell->ly; j++) {
+      dy = j+0.5-y0;
+      if (dx*dx+dy*dy <= r2) {
+	cell->field[0][i][j] = 1.0;
+	cell->field[1][i][j] = 1.0;
+      }
     }
   }
   calculateCM(cell, &cell->xcm, &cell->ycm);
@@ -163,53 +172,56 @@ void shiftCoordinates(Cell* cell, int xShift, int yShift) {
   startUpdateCellField(cell);
   int set = cell->setIndex;
   int get = cell->getIndex;
-  int xStart, xEnd, yStart, yEnd; // these are in the old frame
-  int zeroXStart, zeroXEnd, zeroYStart, zeroYEnd; // these are in the new frame
+  // These are all in the new frame
+  int clx = cell->lx;
+  int cly = cell->ly;
+  int xStart, xEnd, yStart, yEnd;
+  int zeroXStart, zeroXEnd, zeroYStart, zeroYEnd;
+
   if (xShift >= 0) {
-    xStart = xShift;
-    xEnd = cell->lx;
-    zeroXStart = cell->lx - xShift;
-    zeroXEnd = cell->lx;
-  } else {
     xStart = 0;
-    xEnd = cell->lx + xShift;
+    xEnd = clx - xShift;
+    zeroXStart = xEnd;
+    zeroXEnd = clx;
+  } else {
+    xStart = -xShift;
+    xEnd = clx;
     zeroXStart = 0;
-    zeroXEnd = -xShift;
+    zeroXEnd = xStart;
   }
   if (yShift >= 0) {
-    yStart = yShift;
-    yEnd = cell->ly;
-    zeroYStart = cell->ly - yShift;
-    zeroYEnd = cell->ly;
-  } else {
     yStart = 0;
-    yEnd = cell->ly + yShift;
+    yEnd = cly - yShift;
+    zeroYStart = yEnd;
+    zeroYEnd = cly;
+  } else {
+    yStart = -yShift;
+    yEnd = cly;
     zeroYStart = 0;
-    zeroYEnd = -yShift;
+    zeroYEnd = yStart;
+  }
+
+  // Copy the data
+  for (int i = xStart; i < xEnd; i++) {
+    for (int j = yStart; j < yEnd; j++) {
+      cell->field[set][i][j] = cell->field[get][i+xShift][j+yShift];
+    }
   }
 
   // Set empty cells to zero
   for (int i = zeroXStart; i < zeroXEnd; i++) {
-    for (int j = 0; j < cell->ly; j++) {
+    for (int j = 0; j < cly; j++) {
       cell->field[set][i][j] = 0.0;
     }
   }
-
   if (zeroYStart < zeroYEnd) {
-    for (int i = 0; i < cell->lx; i++) {
+    for (int i = 0; i < clx; i++) {
       for (int j = zeroYStart; j < zeroYEnd; j++) {
 	cell->field[set][i][j] = 0.0;
       }
     }
   }
-
-  // Shift cells
-  for (int i = xStart; i < xEnd; i++) {
-    for (int j = yStart; j < yEnd; j++) {
-      cell->field[set][i-xShift][j-yShift] = cell->field[get][i][j];
-    }
-  }
-
+  
   // Update end coordinate
   cell->x += xShift;
   cell->y += yShift;

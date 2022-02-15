@@ -7,7 +7,7 @@
 #include <stdbool.h>
 #include <math.h>
 #include "dump.h"
-#include "phase_field_model.h"
+#include "model.h"
 #include "cell.h"
 #include "array.h"
 #include "util.h"
@@ -17,7 +17,7 @@ typedef struct DeformFieldDump {
   bool overwrite;
 } DeformFieldDump;
 
-void deformFieldOutput(DeformFieldDump* dump, PhaseFieldModel* model, 
+void deformFieldOutput(DeformFieldDump* dump, Model* model, 
 		       int step) {
   char tmpfile [PF_DIR_SIZE];
   if (dump->overwrite) {
@@ -35,7 +35,7 @@ void deformFieldOutput(DeformFieldDump* dump, PhaseFieldModel* model,
   Cell* cell;
   int clx, cly, cx, cy, x, y;
   int iuu, iu, id, idd, juu, ju, jd, jdd; // Nearest neighbours
-  double gradx, grady, gxx, gyy, gxy;
+  double gphix, gphiy, sxx, sxy;
   double** cellField;
   double*** field = create3DDoubleArray(model->lx, model->ly, 3);
   for (int m = 0; m < model->numOfCells; m++) {
@@ -45,9 +45,8 @@ void deformFieldOutput(DeformFieldDump* dump, PhaseFieldModel* model,
     cx = cell->x;
     cy = cell->y;
     cellField = cell->field[cell->getIndex];
-    gxx = 0.0;
-    gyy = 0.0;
-    gxy = 0.0;
+    sxx = 0.0;
+    sxy = 0.0;
     for (int i = 2; i < clx-2; i++) {
       iu = iup(clx, i);
       iuu = iup(clx, iu);
@@ -58,27 +57,27 @@ void deformFieldOutput(DeformFieldDump* dump, PhaseFieldModel* model,
 	juu = iup(cly, ju);
 	jd = idown(cly, j);
 	jdd = idown(cly, jd);
-	gradx = grad4(i, j, iuu, iu, id, idd, 0, cellField);
-	grady = grad4(i, j, juu, ju, jd, jdd, 1, cellField);
-	gxx += gradx*gradx;
-	gyy += grady*grady;
-	gxy += gradx*grady;
+	gphix = grad4(i, j, iuu, iu, id, idd, 0, cellField);
+	gphiy = grad4(i, j, juu, ju, jd, jdd, 1, cellField);
+	sxx += gphiy * gphiy - gphix * gphix;
+	sxy -= gphix * gphiy;
       }
     }
+    sxx *= 0.5;
     // Add results to total field
     for (int i = 0; i < clx; i++) {
       for (int j = 0; j < cly; j++) {
-	x = iwrap(clx, cx+i);
-	y = iwrap(cly, cy+j);
-	field[x][y][0] += cellField[i][j]*gxx;
-	field[x][y][1] += cellField[i][j]*gyy;
-	field[x][y][2] += cellField[i][j]*gxy;
+	x = iwrap(model->lx, cx+i);
+	y = iwrap(model->ly, cy+j);
+	field[x][y][0] += cellField[i][j] * sxx;
+	field[x][y][1] += cellField[i][j] * sxy;
+	field[x][y][2] -= cellField[i][j] * sxx;
       }
     }
   }
   for (int i = 0; i < model->lx; i++) {
     for (int j = 0; j < model->ly; j++) {
-      fprintf(f, "%d %d %.5f %.5f %.5f\n", i, j,
+      fprintf(f, "%d %d %g %g %g\n", i, j,
 	      field[i][j][0], field[i][j][1], field[i][j][2]);
     }
     fprintf(f,"\n");
@@ -96,7 +95,7 @@ void deleteDeformFieldDump(DeformFieldDump* dump) {
 
 DumpFuncs deformFieldDumpFuncs =
   {
-   .output = (void (*)(Dump*, PhaseFieldModel*, int)) &deformFieldOutput,
+   .output = (void (*)(Dump*, Model*, int)) &deformFieldOutput,
    .destroy = (void (*)(Dump*)) &deleteDeformFieldDump
   };
 

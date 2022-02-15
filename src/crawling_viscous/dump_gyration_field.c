@@ -6,7 +6,7 @@
 #include <string.h>
 #include <stdbool.h>
 #include "dump.h"
-#include "phase_field_model.h"
+#include "model.h"
 #include "cell.h"
 #include "array.h"
 #include "util.h"
@@ -16,7 +16,7 @@ typedef struct GyrationFieldDump {
   bool overwrite;
 } GyrationFieldDump;
 
-void gyrationFieldOutput(GyrationFieldDump* dump, PhaseFieldModel* model, 
+void gyrationFieldOutput(GyrationFieldDump* dump, Model* model, 
 		    int step) {
   char tmpfile [PF_DIR_SIZE];
   if (dump->overwrite) {
@@ -93,7 +93,7 @@ void deleteGyrationFieldDump(GyrationFieldDump* dump) {
 
 DumpFuncs gyrationFieldDumpFuncs =
   {
-   .output = (void (*)(Dump*, PhaseFieldModel*, int)) &gyrationFieldOutput,
+   .output = (void (*)(Dump*, Model*, int)) &gyrationFieldOutput,
    .destroy = (void (*)(Dump*)) &deleteGyrationFieldDump
   };
 

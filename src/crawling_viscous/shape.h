@@ -9,10 +9,8 @@
 
 typedef struct ShapeAnalyser {
   int scale;
-  int dataLx;
-  int dataLy;
-  int lx;
-  int ly;
+  int maxDataLx;
+  int maxDataLy;
   double threshold;
 
   // For image analysis
@@ -44,7 +42,7 @@ ShapeAnalyser* createShapeAnalyser(int scale, int dataLx, int dataLy,
 				   int sgolayDegree, int sgolayLength, 
 				   double threshold);
 void deleteShapeAnalyser(ShapeAnalyser* ana);
-ShapeInfo* getShapeInfo(ShapeAnalyser* ana, double** data);
+ShapeInfo* getShapeInfo(ShapeAnalyser* ana, int lx, int ly, double** data);
 void deleteShapeInfo(ShapeInfo* shapeInfo);
 
 #endif

@@ -27,6 +27,7 @@ typedef struct {
   double deltaXCM;
   double deltaYCM;
   double volume; // Total volume of the cell
+  double radius; // Ideal radius of the cell
   double incell;
   double** chemPot; // Chemical potential (func. deriv. of free energy wrt phi)
   double*** gradChemPot; // Gradient of chemical potential
@@ -37,8 +38,8 @@ typedef struct {
 Cell* createCell(int x, int y, int lx, int ly, double dr,
 		 double incell, unsigned long seed);
 void deleteCell(Cell* cell);
-void initFieldSquare(Cell* cell, int x0, int y0, int dx, int dy, double phi0);
-void initField(Cell* cell, double** field);
+void setField(Cell* cell, double** field);
+void initCircleField(Cell* cell, double radius);
 void updateCM(Cell* cell);
 void updateVolume(Cell* cell);
 void updateGradient(Cell* cell);

@@ -5,6 +5,8 @@
 #define IMAGE_H
 
 typedef struct Image {
+  int maxLx;
+  int maxLy;
   int lx;
   int ly;
   double** data;
@@ -25,10 +27,9 @@ Image* createEmptyImage(int lx, int ly);
 Image* createImageFromData(int lx, int ly, double** data);
 Image* createGaussianKernel(int lx, int ly, double sigma);
 void deleteImage(Image* image);
-
+void setImageDimensions(Image* image, int lx, int ly);
 Boundary* traceBoundary(double threshold, Image* image);
 void deleteBoundary(Boundary* boundary);
-
 void conv(Image* image1, Image* image2, Image* convImage);
 
 #endif

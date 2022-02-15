@@ -11,6 +11,8 @@ Image* createEmptyImage(int lx, int ly) {
   Image* image = malloc(sizeof *image);
   image->lx = lx;
   image->ly = ly;
+  image->maxLx = lx;
+  image->maxLy = ly;
   image->data = create2DDoubleArray(lx, ly);
   return image;
 }
@@ -19,6 +21,8 @@ Image* createImageFromData(int lx, int ly, double** data) {
   Image* image = malloc(sizeof *image);
   image->lx = lx;
   image->ly = ly;
+  image->maxLx = lx;
+  image->maxLy = ly;
   image->data = create2DDoubleArray(lx, ly);
   for (int i = 0; i < lx; i++) {
     for (int j = 0; j < ly; j++) {
@@ -31,6 +35,18 @@ Image* createImageFromData(int lx, int ly, double** data) {
 void deleteImage(Image* image) {
   free(image->data);
   free(image);
+}
+
+void setImageDimensions(Image* image, int lx, int ly) {
+  if (lx > image->maxLx || ly > image->maxLy) {
+    printf("Warning: cannot set the new image dimensions as they\n");
+    printf("exceed the maximum image dimensions:\n");
+    printf("New dims = (%d, %d); max dims = (%d, %d)\n",
+	   lx, ly, image->maxLx, image->maxLy);
+    exit(1);
+  }
+  image->lx = lx;
+  image->ly = ly;
 }
 
 Image* createGaussianKernel(int lx, int ly, double sigma) {

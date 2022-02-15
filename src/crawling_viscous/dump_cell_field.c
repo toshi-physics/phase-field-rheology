@@ -6,7 +6,7 @@
 #include <string.h>
 #include <stdbool.h>
 #include "dump.h"
-#include "phase_field_model.h"
+#include "model.h"
 #include "cell.h"
 
 typedef struct CellFieldDump {
@@ -15,7 +15,7 @@ typedef struct CellFieldDump {
   bool overwrite;
 } CellFieldDump;
 
-void cellFieldOutput(CellFieldDump* dump, PhaseFieldModel* model, int step) {
+void cellFieldOutput(CellFieldDump* dump, Model* model, int step) {
   char tmpfile [PF_DIR_SIZE];
   if (dump->overwrite) {
     strcpy(tmpfile, dump->super.filename);
@@ -28,10 +28,12 @@ void cellFieldOutput(CellFieldDump* dump, PhaseFieldModel* model, int step) {
   }
   FILE* f = fopen(tmpfile, "w");
   Cell* cell = model->cells[dump->cellIndex];
-  int get = cell->getIndex;
-  for (int i = 0; i < model->cellLx; i++) {
-    for (int j = 0; j < model->cellLy; j++) {
-      fprintf(f, "%d %d %.5f\n", i, j, cell->field[get][i][j]);
+  int clx = cell->lx;
+  int cly = cell->ly;
+  double** cellField = cell->field[cell->getIndex];
+  for (int i = 0; i < clx; i++) {
+    for (int j = 0; j < cly; j++) {
+      fprintf(f, "%d %d %.5f\n", i, j, cellField[i][j]);
     }
     fprintf(f, "\n");
   }  
@@ -47,7 +49,7 @@ void deleteCellFieldDump(CellFieldDump* dump) {
 
 DumpFuncs cellFieldDumpFuncs =
   {
-   .output = (void (*)(Dump*, PhaseFieldModel*, int)) &cellFieldOutput,
+   .output = (void (*)(Dump*, Model*, int)) &cellFieldOutput,
    .destroy = (void (*)(Dump*)) &deleteCellFieldDump
   };
 

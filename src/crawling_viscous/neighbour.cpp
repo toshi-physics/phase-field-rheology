@@ -10,7 +10,7 @@ using std::set;
 extern "C" {
 #include "cell.h"
 #include "array.h"
-#include "phase_field_model.h"
+#include "model.h"
 #include "neighbour.h"
 #include "util.h"
 
@@ -35,7 +35,7 @@ extern "C" {
   }
   
   NeighbourList** getNeighbourList(NeighbourAnalyser* ana,
-				   PhaseFieldModel* model) {
+				   Model* model) {
     int ncells = model->numOfCells;
     
     getIndexField(ana, model);
@@ -80,7 +80,7 @@ extern "C" {
     return list;
   }
 
-  int** getIndexField(NeighbourAnalyser* ana, PhaseFieldModel* model) {
+  int** getIndexField(NeighbourAnalyser* ana, Model* model) {
     int** indexField;
     double** totalField;
     int lx = model->lx;

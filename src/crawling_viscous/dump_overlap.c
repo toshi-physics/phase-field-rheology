@@ -7,7 +7,7 @@
 #include <stdbool.h>
 #include <omp.h>
 #include "dump.h"
-#include "phase_field_model.h"
+#include "model.h"
 #include "cell.h"
 #include "overlap.h"
 #include "array.h"
@@ -20,7 +20,7 @@ typedef struct OverlapDump {
   OverlapAnalyser** analysers; // One analyser per thread
 } OverlapDump;
 
-void overlapOutput(OverlapDump* dump, PhaseFieldModel* model, int step) {
+void overlapOutput(OverlapDump* dump, Model* model, int step) {
   char tmpfile [PF_DIR_SIZE];
   FILE* f;
   if (dump->overwrite) {
@@ -74,7 +74,7 @@ void deleteOverlapDump(OverlapDump* dump) {
 
 DumpFuncs overlapDumpFuncs =
   {
-   .output = (void (*)(Dump*, PhaseFieldModel*, int)) &overlapOutput,
+   .output = (void (*)(Dump*, Model*, int)) &overlapOutput,
    .destroy = (void (*)(Dump*)) &deleteOverlapDump
   };
 

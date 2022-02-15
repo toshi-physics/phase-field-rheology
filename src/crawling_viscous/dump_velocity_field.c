@@ -7,7 +7,7 @@
 #include <stdbool.h>
 #include <math.h>
 #include "dump.h"
-#include "phase_field_model.h"
+#include "model.h"
 #include "cell.h"
 #include "array.h"
 #include "util.h"
@@ -17,7 +17,7 @@ typedef struct VelocityFieldDump {
   bool overwrite;
 } VelocityFieldDump;
 
-void velocityFieldOutput(VelocityFieldDump* dump, PhaseFieldModel* model, 
+void velocityFieldOutput(VelocityFieldDump* dump, Model* model, 
 			 int step) {
   char tmpfile [PF_DIR_SIZE];
   if (dump->overwrite) {
@@ -36,7 +36,7 @@ void velocityFieldOutput(VelocityFieldDump* dump, PhaseFieldModel* model,
   int clx, cly, cx, cy, x, y;
   double cvx, cvy, cvcmx, cvcmy;
   double** cellField;
-  double*** field = create3DDoubleArray(model->lx, model->ly, 4);
+  double*** field = create3DDoubleArray(model->lx, model->ly, 5);
   for (int m = 0; m < model->numOfCells; m++) {
     cell = model->cells[m];
     clx = cell->lx;
@@ -52,17 +52,22 @@ void velocityFieldOutput(VelocityFieldDump* dump, PhaseFieldModel* model,
       for (int j = 0; j < cly; j++) {
 	x = iwrap(model->lx, cx+i);
 	y = iwrap(model->ly, cy+j);
-	field[x][y][0] += cellField[i][j]*cvx;
-	field[x][y][1] += cellField[i][j]*cvy;
-	field[x][y][2] += cellField[i][j]*cvcmx;
-	field[x][y][3] += cellField[i][j]*cvcmy;
+	field[x][y][0] += cellField[i][j];
+	field[x][y][1] += cellField[i][j] * cvx;
+	field[x][y][2] += cellField[i][j] * cvy;
+	field[x][y][3] += cellField[i][j] * cvcmx;
+	field[x][y][4] += cellField[i][j] * cvcmy;
+	
       }
     }
   }
   for (int i = 0; i < model->lx; i++) {
     for (int j = 0; j < model->ly; j++) {
-      fprintf(f, "%d %d %.5e %.5e %.5e %.5e\n", i, j, field[i][j][0], 
-	      field[i][j][1], field[i][j][2], field[i][j][3]);
+      fprintf(f, "%d %d %g %g %g %g\n", i, j, 
+	      field[i][j][1] / field[i][j][0],
+	      field[i][j][2] / field[i][j][0],
+	      field[i][j][3] / field[i][j][0],
+	      field[i][j][4] / field[i][j][0]);
     }
     fprintf(f,"\n");
   }
@@ -79,7 +84,7 @@ void deleteVelocityFieldDump(VelocityFieldDump* dump) {
 
 DumpFuncs velocityFieldDumpFuncs =
   {
-   .output = (void (*)(Dump*, PhaseFieldModel*, int)) &velocityFieldOutput,
+   .output = (void (*)(Dump*, Model*, int)) &velocityFieldOutput,
    .destroy = (void (*)(Dump*)) &deleteVelocityFieldDump
   };
 

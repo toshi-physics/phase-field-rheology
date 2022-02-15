@@ -7,7 +7,7 @@
 #include <stdbool.h>
 #include <math.h>
 #include "dump.h"
-#include "phase_field_model.h"
+#include "model.h"
 #include "cell.h"
 #include "array.h"
 
@@ -15,7 +15,7 @@ typedef struct BulkCMDump {
   Dump super; // Base struct must be the first element
 } BulkCMDump;
 
-void bulkCMOutput(BulkCMDump* dump, PhaseFieldModel* model, int step) {
+void bulkCMOutput(BulkCMDump* dump, Model* model, int step) {
   FILE* f;
   f = fopen(dump->super.filename, "a");
   // Compute the bulk cm
@@ -45,7 +45,7 @@ void bulkCMOutput(BulkCMDump* dump, PhaseFieldModel* model, int step) {
   xcm /= totalMass;
   ycm /= totalMass;
   
-  fprintf(f, "%d %.5f %.5f\n", step, xcm, ycm);
+  fprintf(f, "%d %g %g\n", step, xcm, ycm);
   fclose(f);
 }
 
@@ -55,7 +55,7 @@ void deleteBulkCMDump(BulkCMDump* dump) {
 
 DumpFuncs bulkCMDumpFuncs =
   {
-   .output = (void (*)(Dump*, PhaseFieldModel*, int)) &bulkCMOutput,
+   .output = (void (*)(Dump*, Model*, int)) &bulkCMOutput,
    .destroy = (void (*)(Dump*)) &deleteBulkCMDump
   };
 

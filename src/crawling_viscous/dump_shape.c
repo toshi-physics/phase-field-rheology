@@ -7,7 +7,7 @@
 #include <stdbool.h>
 #include <omp.h>
 #include "dump.h"
-#include "phase_field_model.h"
+#include "model.h"
 #include "cell.h"
 #include "shape.h"
 #include "array.h"
@@ -20,7 +20,7 @@ typedef struct ShapeDump {
   ShapeAnalyser** analysers; // One analyser per thread
 } ShapeDump;
 
-void shapeOutput(ShapeDump* dump, PhaseFieldModel* model, int step) {
+void shapeOutput(ShapeDump* dump, Model* model, int step) {
   char tmpfile [PF_DIR_SIZE];
   FILE* f;
   if (dump->overwrite) {
@@ -48,7 +48,8 @@ void shapeOutput(ShapeDump* dump, PhaseFieldModel* model, int step) {
 #pragma omp for schedule(static)
     for (j = 0; j < ncells; j++) {
       cell = model->cells[j];
-      info[j] = getShapeInfo(analyser, cell->field[cell->getIndex]);
+      info[j] = getShapeInfo(analyser, cell->lx, cell->ly, 
+			     cell->field[cell->getIndex]);
     }
   }
   // Output the shape data to file
@@ -62,7 +63,7 @@ void shapeOutput(ShapeDump* dump, PhaseFieldModel* model, int step) {
     perimeter = info[i]->perimeter;
     pixelArea = info[i]->pixelArea;
     chainPerimeter = info[i]->chainPerimeter;
-    fprintf(f, "%.5f %.5f %.5f %.5f %d\n", perimeter, area,
+    fprintf(f, "%g %g %g %g %d\n", perimeter, area,
 	    chainPerimeter, pixelArea, pixels);
   }
   fclose(f);
@@ -87,7 +88,7 @@ void deleteShapeDump(ShapeDump* dump) {
 
 DumpFuncs shapeDumpFuncs =
   {
-   .output = (void (*)(Dump*, PhaseFieldModel*, int)) &shapeOutput,
+   .output = (void (*)(Dump*, Model*, int)) &shapeOutput,
    .destroy = (void (*)(Dump*)) &deleteShapeDump
   };
 

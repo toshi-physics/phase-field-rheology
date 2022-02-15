@@ -1,7 +1,7 @@
 // dump.c
 
 #include <string.h>
-#include "phase_field_model.h"
+#include "model.h"
 #include "cell.h"
 #include "dump.h"
 
@@ -19,7 +19,7 @@ void deleteDump(Dump* dump) {
   dump->funcs->destroy(dump);
 }
 
-void dumpOutput(Dump* dump, PhaseFieldModel* model, int step) {
+void dumpOutput(Dump* dump, Model* model, int step) {
   if (step % dump->printInc == 0) {
     dump->funcs->output(dump, model, step);
   }

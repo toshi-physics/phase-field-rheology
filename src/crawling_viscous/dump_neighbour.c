@@ -6,7 +6,7 @@
 #include <string.h>
 #include <stdbool.h>
 #include "dump.h"
-#include "phase_field_model.h"
+#include "model.h"
 #include "cell.h"
 #include "neighbour.h"
 
@@ -16,7 +16,7 @@ typedef struct NeighbourDump {
   NeighbourAnalyser* analyser;
 } NeighbourDump;
 
-void neighbourOutput(NeighbourDump* dump, PhaseFieldModel* model, int step) {
+void neighbourOutput(NeighbourDump* dump, Model* model, int step) {
   char tmpfile [PF_DIR_SIZE];
   FILE* f;
   if (dump->overwrite) {
@@ -55,7 +55,7 @@ void deleteNeighbourDump(NeighbourDump* dump) {
 
 DumpFuncs neighbourDumpFuncs =
   {
-   .output = (void (*)(Dump*, PhaseFieldModel*, int)) &neighbourOutput,
+   .output = (void (*)(Dump*, Model*, int)) &neighbourOutput,
    .destroy = (void (*)(Dump*)) &deleteNeighbourDump
   };
 

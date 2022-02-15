@@ -7,7 +7,7 @@
 #include <stdbool.h>
 #include <math.h>
 #include "dump.h"
-#include "phase_field_model.h"
+#include "model.h"
 #include "cell.h"
 
 typedef struct VelocityDump {
@@ -15,7 +15,7 @@ typedef struct VelocityDump {
   bool overwrite;
 } VelocityDump;
 
-void velocityOutput(VelocityDump* dump, PhaseFieldModel* model, int step) {
+void velocityOutput(VelocityDump* dump, Model* model, int step) {
   char tmpfile [PF_DIR_SIZE];
   FILE* f;
   if (dump->overwrite) {
@@ -45,12 +45,12 @@ void velocityOutput(VelocityDump* dump, PhaseFieldModel* model, int step) {
       wx = x - ix * model->lx;
       wy = y - iy * model->ly;
       // Output periodic CM and boundary count
-      fprintf(f, "%.5f %.5f %d %d ", wx, wy, ix, iy);
+      fprintf(f, "%f %f %d %d ", wx, wy, ix, iy);
     }
     // Advection velocity
-    fprintf(f, "%.5e %.5e ", cell->vx, cell->vy);
+    fprintf(f, "%g %g ", cell->vx, cell->vy);
     // CM velocity
-    fprintf(f, "%.5e %.5e\n", cell->drx/model->dt, cell->dry/model->dt);
+    fprintf(f, "%g %g\n", cell->drx/model->dt, cell->dry/model->dt);
   }
   fclose(f);
   if (dump->overwrite) {
@@ -64,7 +64,7 @@ void deleteVelocityDump(VelocityDump* dump) {
 
 DumpFuncs velocityDumpFuncs =
   {
-   .output = (void (*)(Dump*, PhaseFieldModel*, int)) &velocityOutput,
+   .output = (void (*)(Dump*, Model*, int)) &velocityOutput,
    .destroy = (void (*)(Dump*)) &deleteVelocityDump
   };
 

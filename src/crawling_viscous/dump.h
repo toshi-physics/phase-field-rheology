@@ -16,11 +16,11 @@
 #define PF_HAS_ARMA 1
 #endif
 
-struct PhaseFieldModel;
+struct Model;
 struct Dump;
 
 typedef struct DumpFuncs {
-  void (*output)(struct Dump* dump, struct PhaseFieldModel* model, int step);
+  void (*output)(struct Dump* dump, struct Model* model, int step);
   void (*destroy)(struct Dump* dump);
 } DumpFuncs;
 
@@ -31,7 +31,7 @@ typedef struct Dump {
   int printInc;
 } Dump;
 
-void dumpOutput(Dump* dump, struct PhaseFieldModel* model, int step);
+void dumpOutput(Dump* dump, struct Model* model, int step);
 void deleteDump(Dump* dump);
 void setDump(Dump* dump, void* derived, char* filename, int printInc,
 	     DumpFuncs* funcs);
@@ -50,8 +50,7 @@ Dump* createDeformDump(char* filename, int printInc, bool overwrite);
 Dump* createDeformFieldDump(char* filename, int printInc, bool overwrite);
 Dump* createNeighbourDump(char* filename, int lx, int ly, int printInc,
 			  bool overwrite);
-Dump* createEnergyDump(char* filename, int lx, int ly, int printInc,
-		       bool overwrite);
+Dump* createEnergyDump(char* filename, int lx, int ly, int printInc);
 Dump* createOverlapDump(char* filename, int clx, int cly, int printInc,
 			bool overwrite);
 Dump* createOverlapFieldDump(char* filename, int clx, int cly, int cellIndex,

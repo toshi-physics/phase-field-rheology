@@ -7,7 +7,7 @@
 #include <stdbool.h>
 #include <math.h>
 #include "dump.h"
-#include "phase_field_model.h"
+#include "model.h"
 #include "cell.h"
 #include "array.h"
 #include "neighbour.h"
@@ -17,7 +17,7 @@ typedef struct IndexFieldDump {
   bool overwrite;
 } IndexFieldDump;
 
-void indexFieldOutput(IndexFieldDump* dump, PhaseFieldModel* model, int step) {
+void indexFieldOutput(IndexFieldDump* dump, Model* model, int step) {
   char tmpfile [PF_DIR_SIZE];
   if (dump->overwrite) {
     strcpy(tmpfile, dump->super.filename);
@@ -49,7 +49,7 @@ void deleteIndexFieldDump(IndexFieldDump* dump) {
 
 DumpFuncs indexFieldDumpFuncs =
   {
-   .output = (void (*)(Dump*, PhaseFieldModel*, int)) &indexFieldOutput,
+   .output = (void (*)(Dump*, Model*, int)) &indexFieldOutput,
    .destroy = (void (*)(Dump*)) &deleteIndexFieldDump
   };
 

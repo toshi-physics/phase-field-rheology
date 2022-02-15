@@ -1,5 +1,5 @@
-// dump_velocity.c
-// Dump the velocities (reduced forces) of the cells
+// dump_deform.c
+// Dump the deformation tensor of each cell
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -7,7 +7,7 @@
 #include <stdbool.h>
 #include <math.h>
 #include "dump.h"
-#include "phase_field_model.h"
+#include "model.h"
 #include "cell.h"
 #include "util.h"
 
@@ -16,7 +16,7 @@ typedef struct DeformDump {
   bool overwrite;
 } DeformDump;
 
-void deformOutput(DeformDump* dump, PhaseFieldModel* model, int step) {
+void deformOutput(DeformDump* dump, Model* model, int step) {
   char tmpfile [PF_DIR_SIZE];
   FILE* f;
   if (dump->overwrite) {
@@ -30,7 +30,7 @@ void deformOutput(DeformDump* dump, PhaseFieldModel* model, int step) {
   Cell* cell;
   int clx, cly;
   int iuu, iu, id, idd, juu, ju, jd, jdd; // Nearest neighbours
-  double gradx, grady, gxx, gyy, gxy;
+  double gphix, gphiy, sxx, sxy, s, s1, s1x, s1y, s2, s2x, s2y;
   double** cellField;
 
   fprintf(f, "Cells: %d\n", model->numOfCells);
@@ -40,9 +40,8 @@ void deformOutput(DeformDump* dump, PhaseFieldModel* model, int step) {
     clx = cell->lx;
     cly = cell->ly;
     cellField = cell->field[cell->getIndex];
-    gxx = 0.0;
-    gyy = 0.0;
-    gxy = 0.0;
+    sxx = 0.0;
+    sxy = 0.0;
     for (int i = 2; i < clx-2; i++) {
       iu = iup(clx, i);
       iuu = iup(clx, iu);
@@ -53,14 +52,24 @@ void deformOutput(DeformDump* dump, PhaseFieldModel* model, int step) {
 	juu = iup(cly, ju);
 	jd = idown(cly, j);
 	jdd = idown(cly, jd);
-	gradx = grad4(i, j, iuu, iu, id, idd, 0, cellField);
-	grady = grad4(i, j, juu, ju, jd, jdd, 1, cellField);
-	gxx += gradx*gradx;
-	gyy += grady*grady;
-	gxy += gradx*grady;
+	gphix = grad4(i, j, iuu, iu, id, idd, 0, cellField);
+	gphiy = grad4(i, j, juu, ju, jd, jdd, 1, cellField);
+	sxx += gphiy * gphiy - gphix * gphix;
+	sxy -= gphix * gphiy;
       }
     }
-    fprintf(f, "%.5f %.5f %.5f\n", gxx, gyy, gxy);
+    sxx *= 0.5;
+    // Compute eigenvalues and eigenvectors
+    s = sqrt(sxx * sxx + sxy * sxy);
+    s1y = (s - sxx) / sxy;
+    s1 = sqrt(1.0 + s1y * s1y); // s1x = 1.0
+    s1x = 1.0 / s1;
+    s1y /= s1;
+    s2y = -(s + sxx) / sxy;
+    s2 = sqrt(1.0 + s2y * s2y); // s2x = 1.0
+    s2x = 1.0 / s2;
+    s2y /= s2;
+    fprintf(f, "%f %f %f %f %f %f %f\n", sxx, sxy, s, s1x, s1y, s2x, s2y);
   }
   fclose(f);
   if (dump->overwrite) {
@@ -74,7 +83,7 @@ void deleteDeformDump(DeformDump* dump) {
 
 DumpFuncs deformDumpFuncs =
   {
-   .output = (void (*)(Dump*, PhaseFieldModel*, int)) &deformOutput,
+   .output = (void (*)(Dump*, Model*, int)) &deformOutput,
    .destroy = (void (*)(Dump*)) &deleteDeformDump
   };
 

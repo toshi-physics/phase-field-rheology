@@ -8,7 +8,7 @@
 extern "C" {
 #endif
   
-#include "phase_field_model.h"
+#include "model.h"
   
   typedef struct NeighbourAnalyser {
     int lx;
@@ -26,9 +26,8 @@ extern "C" {
   NeighbourAnalyser* createNeighbourAnalyser(int lx, int ly);
   void deleteNeighbourAnalyser(NeighbourAnalyser* ana);
   void deleteNeighbourList(NeighbourList* list);
-  NeighbourList** getNeighbourList(NeighbourAnalyser* ana,
-				   PhaseFieldModel* model);
-  int** getIndexField(NeighbourAnalyser* ana, PhaseFieldModel* model);
+  NeighbourList** getNeighbourList(NeighbourAnalyser* ana, Model* model);
+  int** getIndexField(NeighbourAnalyser* ana, Model* model);
   
 #ifdef __cplusplus
 }

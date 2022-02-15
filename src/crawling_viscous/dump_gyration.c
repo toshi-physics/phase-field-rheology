@@ -5,8 +5,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
+#include <math.h>
 #include "dump.h"
-#include "phase_field_model.h"
+#include "model.h"
 #include "cell.h"
 
 typedef struct GyrationDump {
@@ -14,7 +15,7 @@ typedef struct GyrationDump {
   bool overwrite;
 } GyrationDump;
 
-void gyrationOutput(GyrationDump* dump, PhaseFieldModel* model, int step) {
+void gyrationOutput(GyrationDump* dump, Model* model, int step) {
   char tmpfile [PF_DIR_SIZE];
   FILE* f;
   if (dump->overwrite) {
@@ -27,7 +28,7 @@ void gyrationOutput(GyrationDump* dump, PhaseFieldModel* model, int step) {
   
   Cell* cell;
   int clx, cly, count;
-  double dx, dy, gxx, gyy, gxy;
+  double dx, dy, gxx, gyy, gxy, gsum, gdiff, gsqrt, g1, g1x, g1y, g2, g2x, g2y;
   double** cellField;
 
   fprintf(f, "Cells: %d\n", model->numOfCells);
@@ -57,7 +58,21 @@ void gyrationOutput(GyrationDump* dump, PhaseFieldModel* model, int step) {
     gxx /= (double) count;
     gxy /= (double) count;
     gyy /= (double) count;
-    fprintf(f, "%.5f %.5f %.5f\n", gxx, gyy, gxy);
+    // Compute eigenvalues and eigenvectors
+    gsum = gxx + gyy;
+    gdiff = gxx - gyy;
+    gsqrt = sqrt(gdiff * gdiff + 4.0 * gxy * gxy);
+    g1 = 0.5 * (gsum + gsqrt);
+    g2 = 0.5 * (gsum - gsqrt);
+    g1y = (g1 - gxx) / gxy; // g1x = 1.0
+    g1 = sqrt(g1y * g1y + 1.0);
+    g1x = 1.0 / g1;
+    g1y /= g1;
+    g2y = (g2 - gxx) / gxy; // g2x = 1.0
+    g2 = sqrt(g2y * g2y + 1.0);
+    g2x = 1.0 / g2;
+    g2y /= g2;
+    fprintf(f, "%f %f %f %f %f %f %f\n", gxx, gyy, gxy, g1x, g1y, g2x, g2y);
   }
   fclose(f);
   if (dump->overwrite) {
@@ -71,7 +86,7 @@ void deleteGyrationDump(GyrationDump* dump) {
 
 DumpFuncs gyrationDumpFuncs =
   {
-   .output = (void (*)(Dump*, PhaseFieldModel*, int)) &gyrationOutput,
+   .output = (void (*)(Dump*, Model*, int)) &gyrationOutput,
    .destroy = (void (*)(Dump*)) &deleteGyrationDump
   };
 

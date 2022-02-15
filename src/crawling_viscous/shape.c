@@ -22,22 +22,22 @@ double computePerimeter(int npts, double* theta, double* r, double* dr);
 double trapzInt(int nbins, double* x, double* y);
 void insertSort(int npts, double* key, double* value);
 
-ShapeAnalyser* createShapeAnalyser(int scale, int dataLx, int dataLy,
+ShapeAnalyser* createShapeAnalyser(int scale, int maxDataLx, int maxDataLy,
 				   int kernelLen, double sigma,
 				   int sgolayDegree, int sgolayLen, 
 				   double threshold) {
   ShapeAnalyser* ana = malloc(sizeof(*ana));
   ana->scale = scale;
-  ana->dataLx = dataLx;
-  ana->dataLy = dataLy;
-  ana->lx = dataLx*scale;
-  ana->ly = dataLy*scale;
+  ana->maxDataLx = maxDataLx;
+  ana->maxDataLy = maxDataLy;
   ana->threshold = threshold;
   
   // Create the image required for the analysis
-  ana->rawImage = createEmptyImage(ana->lx, ana->ly);
-  ana->intermImage = createEmptyImage(ana->lx, ana->ly);
-  ana->convImage = createEmptyImage(ana->lx, ana->ly);
+  int maxImageLx = maxDataLx*scale;
+  int maxImageLy = maxDataLy*scale;
+  ana->rawImage = createEmptyImage(maxImageLx, maxImageLy);
+  ana->intermImage = createEmptyImage(maxImageLx, maxImageLy);
+  ana->convImage = createEmptyImage(maxImageLx, maxImageLy);
 
   // Create the Gaussian blurring kernels (two 1-D kernels)
   ana->gaussX = createGaussianKernel(kernelLen, 1, sigma);
@@ -64,10 +64,17 @@ void deleteShapeAnalyser(ShapeAnalyser* ana) {
   free(ana);
 }
 
-ShapeInfo* getShapeInfo(ShapeAnalyser* ana, double** data) {
+ShapeInfo* getShapeInfo(ShapeAnalyser* ana, int lx, int ly, double** data) {
   double twopi = 2.0*PF_PI;
-  
+  double scale = ana->scale;
+  double scale2 = scale*scale;
+
   // Rescale the phase field data to the image
+  int imageLx = lx*scale;
+  int imageLy = ly*scale;
+  setImageDimensions(ana->rawImage, imageLx, imageLy);
+  setImageDimensions(ana->intermImage, imageLx, imageLy);
+  setImageDimensions(ana->convImage, imageLx, imageLy);
   loadData(ana, data);
   
   // Blur the image using a Gaussian filter
@@ -191,14 +198,11 @@ ShapeInfo* getShapeInfo(ShapeAnalyser* ana, double** data) {
     drad[npts] = drad[0];
   }
 
-  double scale = ana->scale;
-  double scale2 = scale*scale;
   ShapeInfo* info = malloc(sizeof *info);
-  info->pixels = computePixelArea(ana->dataLx, ana->dataLy,
-				  ana->threshold, data);
+  info->pixels = computePixelArea(lx, ly, ana->threshold, data);
   info->area = computeArea(nptsp1, theta, smoothRad) / scale2;
   info->perimeter = computePerimeter(nptsp1, theta, smoothRad, drad) / scale;
-  info->pixelArea = computePixelArea(ana->lx, ana->ly, ana->threshold,
+  info->pixelArea = computePixelArea(imageLx, imageLy, ana->threshold,
 				     ana->convImage->data) / scale2;
   info->chainPerimeter = computeChainPerimeter(npts, boundary->chain) / scale;
   
@@ -221,8 +225,11 @@ void deleteShapeInfo(ShapeInfo* shapeInfo) {
 }
 
 void loadData(ShapeAnalyser* ana, double** data) {
-  for (int i = 0; i < ana->lx; i++) {
-    for (int j = 0; j < ana->ly; j++) {
+  // Image dimensions need to set correctly before loading data
+  int lx = ana->rawImage->lx;
+  int ly = ana->rawImage->ly;
+  for (int i = 0; i < lx; i++) {
+    for (int j = 0; j < ly; j++) {
       ana->rawImage->data[i][j] = data[i/ana->scale][j/ana->scale];
     }
   }

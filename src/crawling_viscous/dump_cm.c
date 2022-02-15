@@ -7,7 +7,7 @@
 #include <stdbool.h>
 #include <math.h>
 #include "dump.h"
-#include "phase_field_model.h"
+#include "model.h"
 #include "cell.h"
 
 typedef struct CMDump {
@@ -15,7 +15,7 @@ typedef struct CMDump {
   bool overwrite;
 } CMDump;
 
-void cmOutput(CMDump* dump, PhaseFieldModel* model, int step) {
+void cmOutput(CMDump* dump, Model* model, int step) {
   char tmpfile [PF_DIR_SIZE];
   FILE* f;
   if (dump->overwrite) {
@@ -40,7 +40,7 @@ void cmOutput(CMDump* dump, PhaseFieldModel* model, int step) {
     iy = (int) floor(y / model->ly);
     wx = x - ix * model->lx;
     wy = y - iy * model->ly;
-    fprintf(f, "%.5f %.5f %d %d\n", wx, wy, ix, iy);
+    fprintf(f, "%g %g %d %d\n", wx, wy, ix, iy);
   }
   fclose(f);
   if (dump->overwrite) {
@@ -54,7 +54,7 @@ void deleteCMDump(CMDump* dump) {
 
 DumpFuncs cmDumpFuncs =
   {
-   .output = (void (*)(Dump*, PhaseFieldModel*, int)) &cmOutput,
+   .output = (void (*)(Dump*, Model*, int)) &cmOutput,
    .destroy = (void (*)(Dump*)) &deleteCMDump
   };
 

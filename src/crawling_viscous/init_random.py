@@ -45,7 +45,6 @@ def rdiff(lx, ly, x1, x2, y1, y2):
 
 reachedMaxAttempt = False
 for i in range(ncells):
-    print(i)
     if (reachedMaxAttempt):
         print("Reached max number of attempts - try using a different seed",
               "or a smaller radius")
@@ -57,8 +56,7 @@ for i in range(ncells):
         y = rng.random()*ly
         failed = False
         for px,py in pos:
-            print(i, nattempt, x, y, px, py, rdiff(lx, ly, x, px, y, py))
-            if (rdiff(lx, ly, x, px, y, py) < rc):
+            if (rdiff(lx, ly, x, px, y, py) < rc * 2.0):
                 failed = True
                 break
         if (not failed):

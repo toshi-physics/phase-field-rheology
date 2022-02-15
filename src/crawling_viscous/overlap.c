@@ -4,7 +4,7 @@
 #include "array.h"
 #include "overlap.h"
 #include "cell.h"
-#include "phase_field_model.h"
+#include "model.h"
 #include "util.h"
 
 OverlapAnalyser* createOverlapAnalyser(int clx, int cly) {
@@ -20,7 +20,7 @@ void deleteOverlapAnalyser(OverlapAnalyser* ana) {
   free(ana);
 }
 
-double computeOverlap(OverlapAnalyser* ana, PhaseFieldModel* model, 
+double computeOverlap(OverlapAnalyser* ana, Model* model, 
 		      int cellIndex) {
   int lx = model->lx;
   int ly = model->ly;

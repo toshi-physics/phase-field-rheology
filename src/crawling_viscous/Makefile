@@ -27,7 +27,7 @@ ODIR := $(BIN)/obj/
 EDIR := $(BIN)/exe/
 LODIR := $(BIN)/lib/
 
-SRC_C := cell.c phase_field_model.c array.c image.c overlap.c dump.c dump_cm.c dump_bulk_cm.c dump_field.c dump_cell_field.c dump_gyration.c dump_gyration_field.c dump_velocity.c dump_velocity_field.c dump_deform.c dump_deform_field.c dump_neighbour.c dump_energy.c dump_overlap.c dump_overlap_field.c dump_index_field.c random_mtwister.c util.c linear_lapack.c
+SRC_C := cell.c model.c array.c image.c overlap.c dump.c dump_cm.c dump_bulk_cm.c dump_field.c dump_cell_field.c dump_gyration.c dump_gyration_field.c dump_velocity.c dump_velocity_field.c dump_deform.c dump_deform_field.c dump_neighbour.c dump_energy.c dump_overlap.c dump_overlap_field.c dump_index_field.c random_mtwister.c util.c linear_lapack.c
 SRC_CXX := neighbour.cpp
 ifeq ($(HAS_ARMA),1)
 	SRC_C := $(SRC_C) shape.c dump_shape.c
@@ -36,7 +36,7 @@ ifeq ($(HAS_ARMA),1)
 endif
 OBJ_C := $(patsubst %.c, $(ODIR)/%.o, $(SRC_C))
 OBJ_CXX := $(patsubst %.cpp, $(ODIR)/%.o, $(SRC_CXX))
-PRG_SRC := run_phase_field_model.c
+PRG_SRC := run_model.c
 PRG_OBJ := $(patsubst %.c, $(ODIR)/%.o, $(PRG_SRC))
 LSRC := arralloc.c mtwister.c
 LOBJ := $(patsubst %.c, $(LODIR)/%.o, $(LSRC))

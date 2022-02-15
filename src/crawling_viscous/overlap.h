@@ -4,7 +4,7 @@
 #ifndef OVERLAP_H
 #define OVERLAP_H
 
-#include "phase_field_model.h"
+#include "model.h"
 
 typedef struct OverlapAnalyser {
   int numOfCells;
@@ -15,7 +15,6 @@ typedef struct OverlapAnalyser {
 
 OverlapAnalyser* createOverlapAnalyser(int clx, int cly);
 void deleteOverlapAnalyser(OverlapAnalyser* ana);
-double computeOverlap(OverlapAnalyser* ana, PhaseFieldModel* model,
-		      int cellIndex);
+double computeOverlap(OverlapAnalyser* ana, Model* model, int cellIndex);
 
 #endif
