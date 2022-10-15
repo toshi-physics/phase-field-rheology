@@ -275,7 +275,7 @@ void updateTotalCellForceField(Model* model) {
   Cell* cell;
   int clx, cly, x, y, cx, cy;
   double** cellField;
-  double phi, mux, muy, px, py, cpx, cpy;
+  double phi, tphi, mux, muy, px, py, cpx, cpy;
   double polarCoeff = model->frictionCoeff * model->motility;
 
   if (model->activeShearCoeff > 0.0) {
@@ -295,16 +295,19 @@ void updateTotalCellForceField(Model* model) {
     
 #pragma omp parallel for default(none) shared(model, cell, clx, cly, cx, cy) \
   shared(cpx, cpy, cellField, polarCoeff, shearCoeff)			\
-  private(x, y, phi, mux, muy, px, py, ax, ay) schedule(static)
+  private(x, y, phi, tphi, mux, muy, px, py, ax, ay) schedule(static)
       for (int i = 0; i < clx; i++) {
 	x = iwrap(model->lx, cx+i);
 	for (int j = 0; j < cly; j++) {
 	  y = iwrap(model->ly, cy+j);
-	  phi = cellField[i][j];
-	  mux = -phi * cell->gradChemPot[i][j][0];
-	  muy = -phi * cell->gradChemPot[i][j][1];
-	  px = phi * polarCoeff * cpx;
-	  py = phi * polarCoeff * cpy;
+	  tphi = model->totalField[x][y];
+	  if (tphi > 0.0) {
+	    phi = cellField[i][j];
+	    mux = -phi * cell->gradChemPot[i][j][0];
+	    muy = -phi * cell->gradChemPot[i][j][1];
+	    px = phi * polarCoeff * cpx / tphi;
+	    py = phi * polarCoeff * cpy / tphi;
+	  }
 	  ax = shearCoeff * cell->divDeform[i][j][0];
 	  ay = shearCoeff * cell->divDeform[i][j][1];
 	  model->totalCellForceField[x][y][0] += (mux + px + ax);
@@ -325,18 +328,21 @@ void updateTotalCellForceField(Model* model) {
 
 #pragma omp parallel for default(none)					\
   shared(model, cell, clx, cly, cx, cy, cpx, cpy, cellField, polarCoeff) \
-  private(x, y, phi, mux, muy, px, py) schedule(static)
+  private(x, y, phi, tphi, mux, muy, px, py) schedule(static)
       for (int i = 0; i < clx; i++) {
 	x = iwrap(model->lx, cx+i);
 	for (int j = 0; j < cly; j++) {
 	  y = iwrap(model->ly, cy+j);
-	  phi = cellField[i][j];
-	  mux = -phi * cell->gradChemPot[i][j][0];
-	  muy = -phi * cell->gradChemPot[i][j][1];
-	  px = phi * polarCoeff * cpx;
-	  py = phi * polarCoeff * cpy;
-	  model->totalCellForceField[x][y][0] += (mux + px);
-	  model->totalCellForceField[x][y][1] += (muy + py);
+	  tphi = model->totalField[x][y];
+	  if (tphi > 0.0) {
+	    phi = cellField[i][j];
+	    mux = -phi * cell->gradChemPot[i][j][0];
+	    muy = -phi * cell->gradChemPot[i][j][1];
+	    px = phi * polarCoeff * cpx / tphi;
+	    py = phi * polarCoeff * cpy / tphi;
+	    model->totalCellForceField[x][y][0] += (mux + px);
+	    model->totalCellForceField[x][y][1] += (muy + py);
+	  }
 	}
       }
     }
