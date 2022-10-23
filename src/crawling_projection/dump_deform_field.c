@@ -37,7 +37,7 @@ void deformFieldOutput(DeformFieldDump* dump, Model* model,
   int iuu, iu, id, idd, juu, ju, jd, jdd; // Nearest neighbours
   double gphix, gphiy, sxx, sxy;
   double** cellField;
-  double*** field = create3DDoubleArray(model->lx, model->ly, 3);
+  double*** field = create3DDoubleArray(model->lx, model->ly, 2);
   for (int m = 0; m < model->numOfCells; m++) {
     cell = model->cells[m];
     clx = cell->lx;
@@ -71,14 +71,12 @@ void deformFieldOutput(DeformFieldDump* dump, Model* model,
 	y = iwrap(model->ly, cy+j);
 	field[x][y][0] += cellField[i][j] * sxx;
 	field[x][y][1] += cellField[i][j] * sxy;
-	field[x][y][2] -= cellField[i][j] * sxx;
       }
     }
   }
   for (int i = 0; i < model->lx; i++) {
     for (int j = 0; j < model->ly; j++) {
-      fprintf(f, "%d %d %g %g %g\n", i, j,
-	      field[i][j][0], field[i][j][1], field[i][j][2]);
+      fprintf(f, "%d %d %g %g\n", i, j, field[i][j][0], field[i][j][1]);
     }
     fprintf(f,"\n");
   }

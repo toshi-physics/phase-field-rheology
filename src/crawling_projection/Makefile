@@ -13,7 +13,7 @@ CXXFLAGS := -Wall -Wshadow -Winline -O3 -std=c++11 -flto -g
 SHELL := /bin/bash
 BIN := ../../bin/crawling_projection/
 LDIR := ../../lib/
-CONDA_DIR := /home/s1309877/.local/bin/miniconda3/envs/myUtil/
+CONDA_DIR := /home/cchiang2/programs/miniconda3/envs/myUtil/
 INC :=  -I$(CONDA_DIR)/include/ -I$(LDIR)/
 LFLAGS := -L$(CONDA_DIR)/lib/ -lm -lgomp -flto -O3 -llapack -lblas -g
 
