@@ -67,15 +67,15 @@ void gyrationFieldOutput(GyrationFieldDump* dump, Model* model,
       for (int j = 0; j < cly; j++) {
 	x = iwrap(model->lx, cx+i);
 	y = iwrap(model->ly, cy+j);
-	field[x][y][0] += cellField[i][j]*gxx;
-	field[x][y][1] += cellField[i][j]*gyy;
-	field[x][y][2] += cellField[i][j]*gxy;	
+	field[x][y][0] += cellField[i][j] * gxx;
+	field[x][y][1] += cellField[i][j] * gyy;
+	field[x][y][2] += cellField[i][j] * gxy;	
       }
     }
   }
   for (int i = 0; i < model->lx; i++) {
     for (int j = 0; j < model->ly; j++) {
-      fprintf(f, "%d %d %.5f %.5f %.5f\n", i, j,
+      fprintf(f, "%d %d %g %g %g\n", i, j,
 	      field[i][j][0], field[i][j][1], field[i][j][2]);
     }
     fprintf(f,"\n");
