@@ -90,26 +90,27 @@ int main (int argc, char* argv[]) {
   printf("lx = %d\n", lx);
   printf("ly = %d\n", ly);
   printf("ncells = %d\n", ncells);
-  printf("cellRadius = %.5f\n", cellRadius);
-  printf("thickness = %.5f\n", thickness);
-  printf("cahnHilliardCoeff = %.5f\n", cahnHilliardCoeff);
-  printf("volumePenaltyCoeff = %.5f\n", volumePenaltyCoeff);
-  printf("repulsionCoeff = %.5f\n", repulsionCoeff);
-  printf("adhesionCoeff = %.5f\n", adhesionCoeff);
-  printf("frictionCoeff = %.5f\n", frictionCoeff);
-  printf("diffusionCoeff = %.5f\n", diffusionCoeff);
-  printf("activeShearCoeff = %.5f\n", activeShearCoeff);
-  printf("firstViscousCoeff = %.5f\n", firstViscousCoeff);
-  printf("secondViscousCoeff = %.5f\n", secondViscousCoeff);
-  printf("dt = %.5f\n", dt);
-  printf("motility = %.5f\n", motility);
-  printf("mobility = %.5f\n", mobility);
+  printf("cellRadius = %g\n", cellRadius);
+  printf("thickness = %g\n", thickness);
+  printf("cahnHilliardCoeff = %g\n", cahnHilliardCoeff);
+  printf("volumePenaltyCoeff = %g\n", volumePenaltyCoeff);
+  printf("repulsionCoeff = %g\n", repulsionCoeff);
+  printf("adhesionCoeff = %g\n", adhesionCoeff);
+  printf("frictionCoeff = %g\n", frictionCoeff);
+  printf("diffusionCoeff = %g\n", diffusionCoeff);
+  printf("activeShearCoeff = %g\n", activeShearCoeff);
+  printf("firstViscousCoeff = %g\n", firstViscousCoeff);
+  printf("secondViscousCoeff = %g\n", secondViscousCoeff);
+  printf("dt = %g\n", dt);
+  printf("motility = %g\n", motility);
+  printf("mobility = %g\n", mobility);
   printf("seed = %ld\n", seed);
   printf("overlap = %d\n", overlap);
   printf("cell_file = %s\n", cellFile);
   printf("nsteps = %d\n", nsteps);
   printf("nequil = %d\n", nequil);
   printf("nedumps = %d\n", nedumps);
+  printf("ndumps = %d\n", ndumps);
 
   int nthreads = 1;
 #ifdef _OPENMP
@@ -121,6 +122,8 @@ int main (int argc, char* argv[]) {
   int idump = 0;
   int iedump = 0;
   int printInc, overwrite, cellIndex;
+  int computeForceFreqEquil = -1;
+  int computeForceFreq = -1;
   
 #if PF_HAS_ARMA
   int fieldScale, kernelLength, sgolayDegree, sgolayLength, maxCellLx, 
@@ -280,6 +283,20 @@ int main (int argc, char* argv[]) {
 	}
       }
     }
+    // Force dump
+    if (sscanf(line, "dump_force %d %d %s %s",
+	       &printInc, &overwrite, dumpMode, dumpFile) == 4) {
+      if (strcmp(dumpMode, "equil") == 0) {
+	equilDumps[iedump] = 
+	  createForceDump(dumpFile, printInc, overwrite);
+	computeForceFreqEquil = printInc;
+	iedump++;
+      } else if (strcmp(dumpMode, "main") == 0) {
+	dumps[idump] = createForceDump(dumpFile, printInc, overwrite);
+	computeForceFreq = printInc;
+	idump++;
+      }
+    }
     // Energy dump
     if (sscanf(line, "dump_energy %d %s %s",
 	       &printInc, dumpMode, dumpFile) == 3) {
@@ -388,6 +405,7 @@ int main (int argc, char* argv[]) {
   model->dumps = equilDumps;
   model->dt = dt;
   model->doOverlap = overlap;
+  model->computeForceFreq = computeForceFreqEquil;
   
   initCellsFromFile(model, cellFile, seed);
   
@@ -415,6 +433,7 @@ int main (int argc, char* argv[]) {
   model->motility = motility;
   model->ndumps = ndumps;
   model->dumps = dumps;
+  model->computeForceFreq = computeForceFreq;
   
   printf("Doing main simulation run ...\n");
 

@@ -40,7 +40,6 @@ typedef struct {
 Cell* createCell(int x, int y, int lx, int ly, double dr,
 		 double incell, unsigned long seed);
 void deleteCell(Cell* cell);
-void setField(Cell* cell, double** field);
 void initCircleField(Cell* cell, double radius);
 void updateCM(Cell* cell);
 void updateVolume(Cell* cell);

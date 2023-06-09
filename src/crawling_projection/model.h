@@ -46,12 +46,19 @@ typedef struct Model {
   int ndumps;
   
   // Active and passive forces
-  double* polarForce;
+  int computeForce; // Whether to compute individual forces or not
+  int computeForceFreq; // Frequency for computing individual forces
   double* totalForce; // Total force
+  double* polarForce;
+  double* activeShearForce;
+  double* capillForce;
+  double* viscousForce;
+  double* dampingForce;
 
   // Overlaps
   int doOverlap;
   double* viscousMat; // Overlap viscous matrix (in column major format)
+  double* overlapMat;
 
   // Velocity from matrix inversion
   double* solvedVelocity; // Solved velocity vector for each cell

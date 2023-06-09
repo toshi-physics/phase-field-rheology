@@ -53,7 +53,7 @@ void overlapOutput(OverlapDump* dump, Model* model, int step) {
   fprintf(f, "Cells: %d\n", ncells);
   fprintf(f, "Timestep: %d\n", step);
   for (int i = 0; i < ncells; i++) {
-    fprintf(f, "%.5e\n", overlapAvg[i]);
+    fprintf(f, "%g\n", overlapAvg[i]);
   }
   fclose(f);
   if (dump->overwrite) {

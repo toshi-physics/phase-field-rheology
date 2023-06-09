@@ -43,8 +43,8 @@ void gyrationOutput(GyrationDump* dump, Model* model, int step) {
     gxy = 0.0;
     gyy = 0.0;
     count = 0;
-    for (int i = 0; i < clx; i++) {
-      for (int j = 0; j < cly; j++) {
+    for (int i = 2; i < clx-2; i++) {
+      for (int j = 2; j < cly-2; j++) {
 	if (cellField[i][j] > cell->incell) {
 	  dx = i+0.5-cell->xcm;
 	  dy = j+0.5-cell->ycm;
@@ -58,21 +58,6 @@ void gyrationOutput(GyrationDump* dump, Model* model, int step) {
     gxx /= (double) count;
     gxy /= (double) count;
     gyy /= (double) count;
-    // Compute eigenvalues and eigenvectors
-    /*gsum = gxx + gyy;
-    gdiff = gxx - gyy;
-    gsqrt = sqrt(gdiff * gdiff + 4.0 * gxy * gxy);
-    g1 = 0.5 * (gsum + gsqrt);
-    g2 = 0.5 * (gsum - gsqrt);
-    g1y = (g1 - gxx) / gxy; // g1x = 1.0
-    g1 = sqrt(g1y * g1y + 1.0);
-    g1x = 1.0 / g1;
-    g1y /= g1;
-    g2y = (g2 - gxx) / gxy; // g2x = 1.0
-    g2 = sqrt(g2y * g2y + 1.0);
-    g2x = 1.0 / g2;
-    g2y /= g2;
-    fprintf(f, "%f %f %f %f %f %f %f\n", gxx, gyy, gxy, g1x, g1y, g2x, g2y);*/
     fprintf(f, "%f %f %f\n", gxx, gyy, gxy);
   }
   fclose(f);

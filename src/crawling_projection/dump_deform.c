@@ -60,22 +60,6 @@ void deformOutput(DeformDump* dump, Model* model, int step) {
 	sxy += gphix * gphiy;
       }
     }
-    // Compute eigenvalues and eigenvectors
-    /*ssum = sxx + syy;
-    sdiff = sxx - syy;
-    ssqrt = sqrt(sdiff * sdiff + 4.0 * sxy * sxy);
-    s1 = 0.5 * (ssum + ssqrt);
-    s2 = 0.5 * (ssum - ssqrt);
-    s1y = (s1 - sxx) / sxy;
-    s1 = sqrt(s1y * s1y + 1.0); // s1x = 1.0
-    s1x = 1.0 / s1;
-    s1y /= s1;
-    s2y = (s2 - sxx) / sxy;
-    s2 = sqrt(s2y * s2y + 1.0); // s2x = 1.0
-    s2x = 1.0 / s2;
-    s2y /= s2;
-    fprintf(f, "%f %f %f %f %f %f %f %f %f\n", sxx, syy, sxy, s1, s1x, s1y, 
-    s2, s2x, s2y);*/
     fprintf(f, "%f %f %f\n", sxx, syy, sxy);
   }
   fclose(f);

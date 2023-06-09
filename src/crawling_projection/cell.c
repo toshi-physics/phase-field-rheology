@@ -63,17 +63,6 @@ void deleteCell(Cell* cell) {
   free(cell);
 }
 
-void setField(Cell* cell, double** lattice) {
-  for (int i = 0; i < cell->lx; i++) {
-    for (int j = 0; j < cell->ly; j++) {
-      cell->field[0][i][j] = lattice[i][j];
-      cell->field[1][i][j] = lattice[i][j];
-    }
-  }
-  calculateCM(cell, &cell->xcm, &cell->ycm);
-  updateVolume(cell);
-}
-
 void initCircleField(Cell* cell, double r) {
   double x0 = cell->lx/2.0;
   double y0 = cell->ly/2.0;
@@ -135,6 +124,8 @@ void updateCM(Cell* cell) {
     cell->deltaYCM -= yShift;
     cell->xcm -= xShift;
     cell->ycm -= yShift;
+    cell->x += xShift;
+    cell->y += yShift;    
   }
 }
 
@@ -142,8 +133,8 @@ void updateVolume(Cell* cell) {
   double totalVolume = 0.0;
   int get = cell->getIndex;
   double phi;
-  for (int i = 0; i < cell->lx; i++) {
-    for (int j = 0; j < cell->ly; j++) {
+  for (int i = 2; i < cell->lx-2; i++) {
+    for (int j = 2; j < cell->ly-2; j++) {
       phi = cell->field[get][i][j];
       totalVolume += phi*phi;
     }
@@ -156,12 +147,12 @@ void updateGradient(Cell* cell) {
   int clx = cell->lx;
   int cly = cell->ly;
   double** field = cell->field[cell->getIndex];
-  for (int i = 2; i < cell->lx-2; i++) {
+  for (int i = 0; i < cell->lx; i++) {
     iu = iup(clx, i);
     iuu = iup(clx, iu);
     id = idown(clx, i);
     idd = idown(clx, id);
-    for (int j = 2; j < cell->ly-2; j++) {
+    for (int j = 0; j < cell->ly; j++) {
       ju = iup(cly, j);
       juu = iup(cly, ju);
       jd = idown(cly, j);
@@ -181,7 +172,6 @@ void shiftCoordinates(Cell* cell, int xShift, int yShift) {
   int cly = cell->ly;
   int xStart, xEnd, yStart, yEnd;
   int zeroXStart, zeroXEnd, zeroYStart, zeroYEnd;
-
   if (xShift >= 0) {
     xStart = 0;
     xEnd = clx - xShift;
@@ -204,14 +194,12 @@ void shiftCoordinates(Cell* cell, int xShift, int yShift) {
     zeroYStart = 0;
     zeroYEnd = yStart;
   }
-
   // Copy the data
   for (int i = xStart; i < xEnd; i++) {
     for (int j = yStart; j < yEnd; j++) {
       cell->field[set][i][j] = cell->field[get][i+xShift][j+yShift];
     }
   }
-
   // Set empty cells to zero
   for (int i = zeroXStart; i < zeroXEnd; i++) {
     for (int j = 0; j < cly; j++) {
@@ -225,10 +213,6 @@ void shiftCoordinates(Cell* cell, int xShift, int yShift) {
       }
     }
   }
-  
-  // Update end coordinate
-  cell->x += xShift;
-  cell->y += yShift;
   endUpdateCellField(cell);
 }
 

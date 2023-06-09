@@ -66,8 +66,8 @@ void deformFieldOutput(DeformFieldDump* dump, Model* model,
       }
     }    
     // Add results to total field
-    for (int i = 0; i < clx; i++) {
-      for (int j = 0; j < cly; j++) {
+    for (int i = 2; i < clx-2; i++) {
+      for (int j = 2; j < cly-2; j++) {
 	x = iwrap(model->lx, cx+i);
 	y = iwrap(model->ly, cy+j);
 	field[x][y][0] += cellField[i][j] * sxx;

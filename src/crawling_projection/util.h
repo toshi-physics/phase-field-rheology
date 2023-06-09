@@ -20,8 +20,4 @@ double cgrad4(int i, int j, int uu, int u, int d, int dd, int ic, int oc,
 	      double*** field);
 double upwind(int i, int j, int uu, int u, int d, int dd, int comp, 
 	      double v, double** field);
-
-int sgni(int val);
-double sgnd(double val);
-
 #endif

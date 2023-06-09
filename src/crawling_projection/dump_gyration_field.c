@@ -48,8 +48,8 @@ void gyrationFieldOutput(GyrationFieldDump* dump, Model* model,
     gxy = 0.0;
     gyy = 0.0;
     count = 0;
-    for (int i = 0; i < clx; i++) {
-      for (int j = 0; j < cly; j++) {
+    for (int i = 2; i < clx-2; i++) {
+      for (int j = 2; j < cly-2; j++) {
 	if (cellField[i][j] > cell->incell) {
 	  dx = i+0.5-cell->xcm;
 	  dy = j+0.5-cell->ycm;
@@ -63,8 +63,8 @@ void gyrationFieldOutput(GyrationFieldDump* dump, Model* model,
     gxx /= (double) count;
     gxy /= (double) count;
     gyy /= (double) count;
-    for (int i = 0; i < clx; i++) {
-      for (int j = 0; j < cly; j++) {
+    for (int i = 2; i < clx-2; i++) {
+      for (int j = 2; j < cly-2; j++) {
 	x = iwrap(model->lx, cx+i);
 	y = iwrap(model->ly, cy+j);
 	field[x][y][0] += cellField[i][j] * gxx;

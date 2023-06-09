@@ -27,7 +27,7 @@ ODIR := $(BIN)/obj/
 EDIR := $(BIN)/exe/
 LODIR := $(BIN)/lib/
 
-SRC_C := cell.c model.c array.c image.c overlap.c dump.c dump_cm.c dump_bulk_cm.c dump_field.c dump_cell_field.c dump_gyration.c dump_gyration_field.c dump_velocity.c dump_velocity_field.c dump_deform.c dump_deform_field.c dump_neighbour.c dump_energy.c dump_overlap.c dump_overlap_field.c dump_index_field.c random_mtwister.c util.c linear_lapack.c
+SRC_C := cell.c model.c array.c image.c overlap.c dump.c dump_cm.c dump_bulk_cm.c dump_field.c dump_cell_field.c dump_gyration.c dump_gyration_field.c dump_velocity.c dump_velocity_field.c dump_deform.c dump_deform_field.c dump_neighbour.c dump_energy.c dump_force.c dump_overlap.c dump_overlap_field.c dump_index_field.c random_mtwister.c util.c linear_lapack.c
 SRC_CXX := neighbour.cpp
 ifeq ($(HAS_ARMA),1)
 	SRC_C := $(SRC_C) shape.c dump_shape.c
