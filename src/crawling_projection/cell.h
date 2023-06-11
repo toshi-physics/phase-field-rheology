@@ -13,7 +13,7 @@ typedef struct {
   int ly; // y size of lattice
   int x; // x pos of the cell relative to main lattice
   int y; // y pos of the cell relative to main lattice
-  int type;
+  int haloWidth; // Width of the halo on each side of subdomain
   double v; // Speed of the cell
   double vx; // x velocity of the cell
   double vy; // y velocity of the cell
@@ -37,7 +37,7 @@ typedef struct {
   double*** gradField; // Gradient of the phase field
 } Cell;
 
-Cell* createCell(int x, int y, int lx, int ly, double dr,
+Cell* createCell(int x, int y, int lx, int ly, int buf, double dr,
 		 double incell, unsigned long seed);
 void deleteCell(Cell* cell);
 void initCircleField(Cell* cell, double radius);
