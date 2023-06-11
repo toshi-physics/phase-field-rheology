@@ -533,7 +533,6 @@ void updateViscous(Model* model) {
 	    olap *= gamma;
 	    double vismndg = eta * (vismnxx + vismnyy) + olap;
 	    double visnmdg = eta * (visnmxx + visnmyy) + olap;
-	    
 	    visMat[mnxx] = zeta * vismnxx + vismndg;
 	    visMat[mnyx] = zeta * vismnyx;
 	    visMat[mnxy] = zeta * vismnxy;
@@ -707,9 +706,9 @@ void updateCellForces(Model* model, int m) {
   double fpy = 0.0;
   double fax = 0.0;
   double fay = 0.0;
-  for (int i = 0; i < clx; i++) {
+  for (int i = 2; i < clx-2; i++) {
     x = iwrap(model->lx, cx+i);
-    for (int j = 0; j < cly; j++) {
+    for (int j = 2; j < cly-2; j++) {
       y = iwrap(model->ly, cy+j);
       phi = cellField[i][j];
       fcx += phi * model->totalCellForceField[x][y][0];
@@ -744,6 +743,7 @@ void updateVelocity(Model* model) {
 		   model->secondViscousCoeff > 0.0);
   if (model->doOverlap || doViscous) {
     //printf("Start of matrix inversion ...\n");
+    //printMatrix(model->viscousMat, twoncells, twoncells);
     int error = solver(model->viscousMat, model->totalForce, 
 		       model->solvedVelocity, twoncells, 1, 0);
     //printf("End of matrix inversion ...\n");

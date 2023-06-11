@@ -147,12 +147,12 @@ void updateGradient(Cell* cell) {
   int clx = cell->lx;
   int cly = cell->ly;
   double** field = cell->field[cell->getIndex];
-  for (int i = 0; i < cell->lx; i++) {
+  for (int i = 2; i < cell->lx-2; i++) {
     iu = iup(clx, i);
     iuu = iup(clx, iu);
     id = idown(clx, i);
     idd = idown(clx, id);
-    for (int j = 0; j < cell->ly; j++) {
+    for (int j = 2; j < cell->ly-2; j++) {
       ju = iup(cly, j);
       juu = iup(cly, ju);
       jd = idown(cly, j);
@@ -213,6 +213,19 @@ void shiftCoordinates(Cell* cell, int xShift, int yShift) {
       }
     }
   }
+  // Make sure the halo region is zero
+  for (int j = 0; j < cly; j++) {
+    cell->field[set][0][j] = 0.0;
+    cell->field[set][1][j] = 0.0;
+    cell->field[set][clx-2][j] = 0.0;
+    cell->field[set][clx-1][j] = 0.0;
+  }
+  for (int i = 0; i < clx; i++) {
+    cell->field[set][i][0] = 0.0;
+    cell->field[set][i][1] = 0.0;
+    cell->field[set][i][cly-2] = 0.0;
+    cell->field[set][i][cly-1] = 0.0;
+  }  
   endUpdateCellField(cell);
 }
 
