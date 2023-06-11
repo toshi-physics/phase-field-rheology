@@ -124,7 +124,7 @@ void initCellsFromFile(Model* model, char* cellFile,
     if (nvar == 3 || nvar == 5) {
       x = (int) round(xcm-clx/2.0);
       y = (int) round(ycm-cly/2.0);
-      cell = createCell(x, y, clx, cly, model->diffusionCoeff, 0.5, 
+      cell = createCell(x, y, clx, cly, PF_HALO,  model->diffusionCoeff, 0.5, 
 			index+seed);
       cell->radius = model->cellRadius;
       if (nvar == 5) {
@@ -235,7 +235,7 @@ void updateTotalField(Model* model) {
   }
 
   Cell* cell;
-  int clx, cly, x, y, cx, cy;
+  int clx, cly, x, y, cx, cy, buf;
   double phi;
   double** cellField;
   
@@ -245,14 +245,15 @@ void updateTotalField(Model* model) {
     cly = cell->ly;
     cx = cell->x;
     cy = cell->y;
+    buf = cell->haloWidth;
     cellField = cell->field[cell->getIndex];
-#pragma omp parallel for default(none)			\
-  shared(model, lx, ly, cell, clx, cly, cx, cy, cellField)	\
+#pragma omp parallel for default(none)				\
+  shared(model, lx, ly, cell, clx, cly, cx, cy, buf, cellField)	\
   private(x, y, phi) schedule(static)
     // No need to loop over halo area as phi = 0
-    for (int i = 2; i < clx-2; i++) {
+    for (int i = buf; i < clx-buf; i++) {
       x = iwrap(lx, cx+i);
-      for (int j = 2; j < cly-2; j++) {
+      for (int j = buf; j < cly-buf; j++) {
 	y = iwrap(ly, cy+j);
 	phi = cellField[i][j];
 	model->totalField[x][y] += phi;
@@ -303,7 +304,7 @@ void updateTotalField(Model* model) {
 
 void updateTotalCellForceField(Model* model) {
   Cell* cell;
-  int clx, cly, x, y, cx, cy;
+  int clx, cly, x, y, cx, cy, buf;
   double** cellField;
   double phi, tphi, mux, muy, px, py, cpx, cpy;
   double polarCoeff = model->frictionCoeff * model->motility;
@@ -321,15 +322,16 @@ void updateTotalCellForceField(Model* model) {
       cy = cell->y;
       cpx = cell->px;
       cpy = cell->py;
+      buf = cell->haloWidth;
       cellField = cell->field[cell->getIndex];
     
 #pragma omp parallel for default(none) shared(model, cell, clx, cly, cx, cy) \
-  shared(cpx, cpy, cellField, polarCoeff, shearCoeff)			\
+  shared(buf, cpx, cpy, cellField, polarCoeff, shearCoeff)		\
   private(x, y, phi, tphi, mux, muy, px, py, ax, ay) schedule(static)
       // No need to loop over halo area where phi = 0
-      for (int i = 2; i < clx-2; i++) {
+      for (int i = buf; i < clx-buf; i++) {
 	x = iwrap(model->lx, cx+i);
-	for (int j = 2; j < cly-2; j++) {
+	for (int j = buf; j < cly-buf; j++) {
 	  y = iwrap(model->ly, cy+j);
 	  tphi = model->totalField[x][y];
 	  if (tphi > 0.0) {
@@ -359,15 +361,16 @@ void updateTotalCellForceField(Model* model) {
       cy = cell->y;
       cpx = cell->px;
       cpy = cell->py;
+      buf = cell->haloWidth;
       cellField = cell->field[cell->getIndex];
 
 #pragma omp parallel for default(none)					\
-  shared(model, cell, clx, cly, cx, cy, cpx, cpy, cellField, polarCoeff) \
+  shared(model, cell, clx, cly, cx, cy, cpx, cpy, buf, cellField, polarCoeff) \
   private(x, y, phi, tphi, mux, muy, px, py) schedule(static)
       // No need to loop over halo area where phi = 0      
-      for (int i = 2; i < clx-2; i++) {
+      for (int i = buf; i < clx-buf; i++) {
 	x = iwrap(model->lx, cx+i);
-	for (int j = 2; j < cly-2; j++) {
+	for (int j = buf; j < cly-buf; j++) {
 	  y = iwrap(model->ly, cy+j);
 	  tphi = model->totalField[x][y];
 	  if (tphi > 0.0) {
@@ -594,6 +597,7 @@ void updateCellChemPotAndDeform(Model* model, int m) {
   int cly = cell->ly;
   int cx = cell->x;
   int cy = cell->y;
+  int buf = cell->haloWidth;
   int x, y; // Lab frame coordinates of a lattice element
   int iu, iuu, id, idd, ju, juu, jd, jdd; // Nearest neighbours
   double** cellField = cell->field[cell->getIndex];
@@ -609,7 +613,7 @@ void updateCellChemPotAndDeform(Model* model, int m) {
   
   // Apply fixed (Dirichlet) boundary conditions (phi = 0 at boundaries)
   // i and j are coordinates in the cell's own reference frame
-  for (int i = 2; i < clx-2; i++) {
+  for (int i = buf; i < clx-buf; i++) {
     iu = iup(clx, i);
     id = idown(clx, i);
     if (model->activeShearCoeff > 0.0) {
@@ -617,7 +621,7 @@ void updateCellChemPotAndDeform(Model* model, int m) {
       idd = idown(clx, id);
     }
     x = iwrap(model->lx, cx+i);
-    for (int j = 2; j < cly-2; j++) {
+    for (int j = buf; j < cly-buf; j++) {
       ju = iup(cly, j);
       jd = idown(cly, j);
       y = iwrap(model->ly, cy+j);
@@ -661,12 +665,12 @@ void updateCellChemPotAndDeform(Model* model, int m) {
   } // Close loop over i
   
   // Compute gradient of the chemical potential
-  for (int i = 2; i < clx-2; i++) {
+  for (int i = buf; i < clx-buf; i++) {
     iu = iup(clx, i);
     iuu = iup(clx, iu);
     id = idown(clx, i);
     idd = idown(clx, id);
-    for (int j = 2; j < cly-2; j++) {
+    for (int j = buf; j < cly-buf; j++) {
       ju = iup(cly, j);
       juu = iup(cly, ju);
       jd = idown(cly, j);
@@ -697,6 +701,7 @@ void updateCellForces(Model* model, int m) {
   int cly = cell->ly;
   int cx = cell->x;
   int cy = cell->y;
+  int buf = cell->haloWidth;
   int mx = 2 * m;
   int my = mx + 1;
   double** cellField = cell->field[cell->getIndex];
@@ -706,9 +711,9 @@ void updateCellForces(Model* model, int m) {
   double fpy = 0.0;
   double fax = 0.0;
   double fay = 0.0;
-  for (int i = 2; i < clx-2; i++) {
+  for (int i = buf; i < clx-buf; i++) {
     x = iwrap(model->lx, cx+i);
-    for (int j = 2; j < cly-2; j++) {
+    for (int j = buf; j < cly-buf; j++) {
       y = iwrap(model->ly, cy+j);
       phi = cellField[i][j];
       fcx += phi * model->totalCellForceField[x][y][0];
@@ -797,18 +802,19 @@ void updateCellField(Model* model, int m) {
   int cly = cell->ly;
   int set = cell->setIndex;
   int get = cell->getIndex;
+  int buf = cell->haloWidth;
   int iuu, iu, id, idd, juu, ju, jd, jdd;
   double advection;
   double** cellField = cell->field[get];
   
   // Apply fixed (Dirichlet) boundary conditions (phi = 0 at boundaries)
   // i and j are coordinates in the cell's own reference frame
-  for (int i = 2; i < clx-2; i++) {
+  for (int i = buf; i < clx-buf; i++) {
     iu = iup(clx, i);
     iuu = iup(clx, iu);
     id = idown(clx, i);
     idd = idown(clx, id);
-    for (int j = 2; j < cly-2; j++) {
+    for (int j = buf; j < cly-buf; j++) {
       ju = iup(cly, j);
       juu = iup(cly, ju);
       jd = idown(cly, j);

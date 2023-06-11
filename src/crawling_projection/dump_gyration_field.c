@@ -32,7 +32,7 @@ void gyrationFieldOutput(GyrationFieldDump* dump, Model* model,
   // Sum over all the phase fields, each weighted by the gyration tensor
   // of the cell  
   Cell* cell;
-  int clx, cly, cx, cy, x, y, count;
+  int clx, cly, cx, cy, x, y, buf, count;
   double dx, dy, gxx, gyy, gxy;
   double** cellField;
   double*** field = create3DDoubleArray(model->lx, model->ly, 3);
@@ -43,13 +43,14 @@ void gyrationFieldOutput(GyrationFieldDump* dump, Model* model,
     cly = cell->ly;
     cx = cell->x;
     cy = cell->y;
+    buf = cell->haloWidth;
     cellField = cell->field[cell->getIndex];
     gxx = 0.0;
     gxy = 0.0;
     gyy = 0.0;
     count = 0;
-    for (int i = 2; i < clx-2; i++) {
-      for (int j = 2; j < cly-2; j++) {
+    for (int i = buf; i < clx-buf; i++) {
+      for (int j = buf; j < cly-buf; j++) {
 	if (cellField[i][j] > cell->incell) {
 	  dx = i+0.5-cell->xcm;
 	  dy = j+0.5-cell->ycm;
@@ -63,8 +64,8 @@ void gyrationFieldOutput(GyrationFieldDump* dump, Model* model,
     gxx /= (double) count;
     gxy /= (double) count;
     gyy /= (double) count;
-    for (int i = 2; i < clx-2; i++) {
-      for (int j = 2; j < cly-2; j++) {
+    for (int i = buf; i < clx-buf; i++) {
+      for (int j = buf; j < cly-buf; j++) {
 	x = iwrap(model->lx, cx+i);
 	y = iwrap(model->ly, cy+j);
 	field[x][y][0] += cellField[i][j] * gxx;

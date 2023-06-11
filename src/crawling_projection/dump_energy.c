@@ -35,7 +35,7 @@ void energyOutput(EnergyDump* dump, Model* model, int step) {
   // Compute the auxillary field (sum of phi^2)
   Cell* cell;
   double phi, phi2, gphix, gphiy;
-  int clx, cly, x, y, cx, cy;
+  int clx, cly, x, y, cx, cy, buf;
   int iu, iuu, id, idd, ju, juu, jd, jdd;
   double** cellField;
   for (int n = 0; n < model->numOfCells; n++) {
@@ -44,14 +44,15 @@ void energyOutput(EnergyDump* dump, Model* model, int step) {
     cly = cell->ly;
     cx = cell->x;
     cy = cell->y;
+    buf = cell->haloWidth;
     cellField = cell->field[cell->getIndex];
-    for (int i = 2; i < clx-2; i++) {
+    for (int i = buf; i < clx-buf; i++) {
       iu = iup(clx, i);
       iuu = iup(clx, iu);
       id = idown(clx, i);
       idd = idown(clx, id);
       x = iwrap(model->lx, cx+i);
-      for (int j = 2; j < cly-2; j++) {
+      for (int j = buf; j < cly-buf; j++) {
 	ju = iup(cly, j);
 	juu = iup(cly, ju);
 	jd = idown(cly, j);
@@ -83,16 +84,17 @@ void energyOutput(EnergyDump* dump, Model* model, int step) {
     cly = cell->ly;
     cx = cell->x;
     cy = cell->y;
+    buf = cell->haloWidth;
     cellField = cell->field[cell->getIndex];
     cellVolume = 0.0;
     piR2 = PF_PI * cell->radius * cell->radius;
-    for (int i = 2; i < clx-2; i++) {
+    for (int i = buf; i < clx-buf; i++) {
       iu = iup(clx, i);
       iuu = iup(clx, iu);
       id = idown(clx, i);
       idd = idown(clx, id);
       x = iwrap(model->lx, cx+i);
-      for (int j = 2; j < cly-2; j++) {
+      for (int j = buf; j < cly-buf; j++) {
 	ju = iup(cly, j);
 	juu = iup(cly, ju);
 	jd = idown(cly, j);

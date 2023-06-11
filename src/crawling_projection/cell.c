@@ -10,7 +10,7 @@
 #include "constant.h"
 #include "util.h"
 
-Cell* createCell(int x, int y, int lx, int ly,
+Cell* createCell(int x, int y, int lx, int ly, int buf,
 		 double dr, double incell, unsigned long seed) {
   // Allocate memory for a cell
   Cell* cell = malloc(sizeof *cell);
@@ -19,6 +19,7 @@ Cell* createCell(int x, int y, int lx, int ly,
   cell->y = y;
   cell->lx = lx;
   cell->ly = ly;
+  cell->haloWidth = buf;
   cell->incell = incell;
 
   // Allocate memory and initialise the field to zero
@@ -64,13 +65,14 @@ void deleteCell(Cell* cell) {
 }
 
 void initCircleField(Cell* cell, double r) {
+  int buf = cell->haloWidth;
   double x0 = cell->lx/2.0;
   double y0 = cell->ly/2.0;
   double r2 = r*r;
   double dx, dy;
-  for (int i = 0; i < cell->lx; i++) {
+  for (int i = buf; i < cell->lx-buf; i++) {
     dx = i+0.5-x0;
-    for (int j = 0; j < cell->ly; j++) {
+    for (int j = buf; j < cell->ly-buf; j++) {
       dy = j+0.5-y0;
       if (dx*dx+dy*dy <= r2) {
 	cell->field[0][i][j] = 1.0;
@@ -88,8 +90,9 @@ void calculateCM(Cell* cell, double* xcm, double* ycm) {
   double mass = 0.0;
   double phi;
   int get = cell->getIndex;
-  for (int i = 0; i < cell->lx; i++) {
-    for (int j = 0; j < cell->ly; j++) {
+  int buf = cell->haloWidth;
+  for (int i = buf; i < cell->lx-buf; i++) {
+    for (int j = buf; j < cell->ly-buf; j++) {
       phi = cell->field[get][i][j];
       xavg += (phi * (i+0.5)); // Use the centre of a lattice element
       yavg += (phi * (j+0.5));
@@ -132,9 +135,10 @@ void updateCM(Cell* cell) {
 void updateVolume(Cell* cell) {
   double totalVolume = 0.0;
   int get = cell->getIndex;
+  int buf = cell->haloWidth;
   double phi;
-  for (int i = 2; i < cell->lx-2; i++) {
-    for (int j = 2; j < cell->ly-2; j++) {
+  for (int i = buf; i < cell->lx-buf; i++) {
+    for (int j = buf; j < cell->ly-buf; j++) {
       phi = cell->field[get][i][j];
       totalVolume += phi*phi;
     }
@@ -146,13 +150,14 @@ void updateGradient(Cell* cell) {
   int iuu, iu, id, idd, juu, ju, jd, jdd;
   int clx = cell->lx;
   int cly = cell->ly;
+  int buf = cell->haloWidth;
   double** field = cell->field[cell->getIndex];
-  for (int i = 2; i < cell->lx-2; i++) {
+  for (int i = buf; i < cell->lx-buf; i++) {
     iu = iup(clx, i);
     iuu = iup(clx, iu);
     id = idown(clx, i);
     idd = idown(clx, id);
-    for (int j = 2; j < cell->ly-2; j++) {
+    for (int j = buf; j < cell->ly-buf; j++) {
       ju = iup(cly, j);
       juu = iup(cly, ju);
       jd = idown(cly, j);
@@ -170,6 +175,7 @@ void shiftCoordinates(Cell* cell, int xShift, int yShift) {
   // These are all in the new frame
   int clx = cell->lx;
   int cly = cell->ly;
+  int buf = cell->haloWidth;
   int xStart, xEnd, yStart, yEnd;
   int zeroXStart, zeroXEnd, zeroYStart, zeroYEnd;
   if (xShift >= 0) {
@@ -215,16 +221,16 @@ void shiftCoordinates(Cell* cell, int xShift, int yShift) {
   }
   // Make sure the halo region is zero
   for (int j = 0; j < cly; j++) {
-    cell->field[set][0][j] = 0.0;
-    cell->field[set][1][j] = 0.0;
-    cell->field[set][clx-2][j] = 0.0;
-    cell->field[set][clx-1][j] = 0.0;
+    for (int k = 0; k < buf; k++) {
+      cell->field[set][k][j] = 0.0;
+      cell->field[set][clx-k-1][j] = 0.0;
+    }
   }
   for (int i = 0; i < clx; i++) {
-    cell->field[set][i][0] = 0.0;
-    cell->field[set][i][1] = 0.0;
-    cell->field[set][i][cly-2] = 0.0;
-    cell->field[set][i][cly-1] = 0.0;
+    for (int k = 0; k < buf; k++) {
+      cell->field[set][i][k] = 0.0;
+      cell->field[set][i][cly-k-1] = 0.0;
+    }
   }  
   endUpdateCellField(cell);
 }

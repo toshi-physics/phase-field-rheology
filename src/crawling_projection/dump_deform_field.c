@@ -33,7 +33,7 @@ void deformFieldOutput(DeformFieldDump* dump, Model* model,
   // Sum over all the phase fields, each weighted by the deformation tensor
   // of the cell
   Cell* cell;
-  int clx, cly, cx, cy, x, y;
+  int clx, cly, cx, cy, x, y, buf;
   int iuu, iu, id, idd, juu, ju, jd, jdd; // Nearest neighbours
   double gphix, gphiy, sxx, syy, sxy;
   double** cellField;
@@ -44,16 +44,17 @@ void deformFieldOutput(DeformFieldDump* dump, Model* model,
     cly = cell->ly;
     cx = cell->x;
     cy = cell->y;
+    buf = cell->haloWidth;
     cellField = cell->field[cell->getIndex];
     sxx = 0.0;
     syy = 0.0;
     sxy = 0.0;
-    for (int i = 2; i < clx-2; i++) {
+    for (int i = buf; i < clx-buf; i++) {
       iu = iup(clx, i);
       iuu = iup(clx, iu);
       id = idown(clx, i);
       idd = idown(clx, id);
-      for (int j = 2; j < cly-2; j++) {
+      for (int j = buf; j < cly-buf; j++) {
 	ju = iup(cly, j);
 	juu = iup(cly, ju);
 	jd = idown(cly, j);
@@ -66,8 +67,8 @@ void deformFieldOutput(DeformFieldDump* dump, Model* model,
       }
     }    
     // Add results to total field
-    for (int i = 2; i < clx-2; i++) {
-      for (int j = 2; j < cly-2; j++) {
+    for (int i = buf; i < clx-buf; i++) {
+      for (int j = buf; j < cly-buf; j++) {
 	x = iwrap(model->lx, cx+i);
 	y = iwrap(model->ly, cy+j);
 	field[x][y][0] += cellField[i][j] * sxx;

@@ -27,8 +27,8 @@ void gyrationOutput(GyrationDump* dump, Model* model, int step) {
   }
   
   Cell* cell;
-  int clx, cly, count;
-  double dx, dy, gxx, gyy, gxy;//, gsum, gdiff, gsqrt, g1, g1x, g1y, g2, g2x, g2y;
+  int clx, cly, buf, count;
+  double dx, dy, gxx, gyy, gxy;
   double** cellField;
 
   fprintf(f, "Cells: %d\n", model->numOfCells);
@@ -38,13 +38,14 @@ void gyrationOutput(GyrationDump* dump, Model* model, int step) {
     cell = model->cells[m];
     clx = cell->lx;
     cly = cell->ly;
+    buf = cell->haloWidth;
     cellField = cell->field[cell->getIndex];
     gxx = 0.0;
     gxy = 0.0;
     gyy = 0.0;
     count = 0;
-    for (int i = 2; i < clx-2; i++) {
-      for (int j = 2; j < cly-2; j++) {
+    for (int i = buf; i < clx-buf; i++) {
+      for (int j = buf; j < cly-buf; j++) {
 	if (cellField[i][j] > cell->incell) {
 	  dx = i+0.5-cell->xcm;
 	  dy = j+0.5-cell->ycm;

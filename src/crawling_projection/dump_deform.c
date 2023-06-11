@@ -28,7 +28,7 @@ void deformOutput(DeformDump* dump, Model* model, int step) {
   }
   
   Cell* cell;
-  int clx, cly;
+  int clx, cly, buf;
   int iuu, iu, id, idd, juu, ju, jd, jdd; // Nearest neighbours
   double gphix, gphiy, sxx, syy, sxy;//, s, s1, s1x, s1y, s2, s2x, s2y;
   double** cellField;
@@ -39,16 +39,17 @@ void deformOutput(DeformDump* dump, Model* model, int step) {
     cell = model->cells[m];
     clx = cell->lx;
     cly = cell->ly;
+    buf = cell->haloWidth;
     cellField = cell->field[cell->getIndex];
     sxx = 0.0;
     syy = 0.0;
     sxy = 0.0;
-    for (int i = 2; i < clx-2; i++) {
+    for (int i = buf; i < clx-buf; i++) {
       iu = iup(clx, i);
       iuu = iup(clx, iu);
       id = idown(clx, i);
       idd = idown(clx, id);
-      for (int j = 2; j < cly-2; j++) {
+      for (int j = buf; j < cly-buf; j++) {
 	ju = iup(cly, j);
 	juu = iup(cly, ju);
 	jd = idown(cly, j);

@@ -33,7 +33,7 @@ void velocityFieldOutput(VelocityFieldDump* dump, Model* model,
   // Sum over all the phase fields, each weighted by the velocity vector
   // of the cell  
   Cell* cell;
-  int clx, cly, cx, cy, x, y;
+  int clx, cly, cx, cy, x, y, buf;
   double cvx, cvy, cvcmx, cvcmy;
   double** cellField;
   double*** field = create3DDoubleArray(model->lx, model->ly, 5);
@@ -45,11 +45,12 @@ void velocityFieldOutput(VelocityFieldDump* dump, Model* model,
     cy = cell->y;
     cvx = cell->vx;
     cvy = cell->vy;
+    buf = cell->haloWidth;
     cvcmx = cell->drx/model->dt;
     cvcmy = cell->dry/model->dt;
     cellField = cell->field[cell->getIndex];
-    for  (int i = 2; i < clx-2; i++) {
-      for (int j = 2; j < cly-2; j++) {
+    for  (int i = buf; i < clx-buf; i++) {
+      for (int j = buf; j < cly-buf; j++) {
 	x = iwrap(model->lx, cx+i);
 	y = iwrap(model->ly, cy+j);
 	field[x][y][0] += cellField[i][j];
