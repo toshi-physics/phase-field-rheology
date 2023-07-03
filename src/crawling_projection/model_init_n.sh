@@ -4,16 +4,17 @@
 # Directory of this script
 sh_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 
-if (( $# != 5 )); then
-    echo "Usage: model_init.sh deform peclet eta0 run run_dir"
+if (( $# != 6 )); then
+    echo "Usage: model_init_n.sh cellN deform peclet eta0 run run_dir"
     exit 1
 fi
 
-deform=$1    # Deformability (d = epsilon/alpha)
-peclet=$2    # Peclet number (Pe = v/(R*Dr))
-eta0=$3       # \eta_0 (\eta_0 = \eta / (\gamma_v * R^2))
-run=$4       # Trial number
-run_dir=$5   # Run directory
+ncells=$1	#number of cells, resize the y axis proportionally to get density of 100/(145*145)
+deform=$2    # Deformability (d = epsilon/alpha)
+peclet=$3    # Peclet number (Pe = v/(R*Dr))
+eta0=$4      # \eta_0 (\eta_0 = \eta / (\gamma_v * R^2))
+run=$5      # Trial number
+run_dir=$6   # Run directory
 
 pyx=python3 # Choose between python2 and python3
 
@@ -21,6 +22,7 @@ pyx=python3 # Choose between python2 and python3
 init_rand_py="${sh_dir}/init_random.py"
 
 # Format input params
+ncells=$($pyx -c "print('{:}'.format($ncells))")
 deform=$($pyx -c "print('{:.2f}'.format($deform))")
 peclet=$($pyx -c "print('{:.2f}'.format($peclet))")
 eta0=$($pyx -c "print('{:.2f}'.format($eta0))")
@@ -34,11 +36,11 @@ function get_rand(){
 }
 
 # Set the model parameters
-ncells=100 # 330
+
 init_radius=5.0
 ideal_radius=8.0 # 12.0
 lx=145
-ly=145 # 145
+ly=$($pyx -c "print('{:.0f}'.format(145*$ncells/100))")
 cell_lx=35 # 41
 cell_ly=35 # 41
 max_cell_lx=35 # 41
@@ -61,7 +63,7 @@ overlap=1 # Do overlap calculation or not
 nsteps=200000 #11000000 # 20000000 # Add another 10^6 steps for equilibration
 nshear=100001 #same as equilibration time rn 
 nequil=10000 # 100000
-delta_t=1.0 # 0.5
+delta_t=0.5 # 0.5
 dump_cm_freq=100 #1000 # 1000
 dump_bulk_cm_freq=100 #1000 # 1000
 dump_gyr_freq=100 #1000 # 1000

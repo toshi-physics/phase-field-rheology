@@ -232,10 +232,10 @@ void updateTotalField(Model* model) {
     for (int i = 0; i < clx; i++) {
       x = iwrap(lx, cx+i);
       for (int j = 0; j < cly; j++) {
-	y = iwrap(ly, cy+j);
-	phi = cellField[i][j];
-	model->totalField[x][y] += phi;
-	model->totalField2[x][y] += phi * phi;
+        y = iwrap(ly, cy+j);
+        phi = cellField[i][j];
+        model->totalField[x][y] += phi;
+        model->totalField2[x][y] += phi * phi;
       }
     }
   }
@@ -251,14 +251,12 @@ void updateTotalField(Model* model) {
       id = idown(lx, i);
       idd = idown(lx, id);
       for (int j = 2; j < ly-2; j++) {
-	ju = iup(ly, j);
-	juu = iup(ly, ju);
-	jd = idown(ly, j);
-	jdd = idown(ly, jd);
-	model->gradTotalField[i][j][0] = 
-	  grad4(i, j, iuu, iu, id, idd, 0, model->totalField);
-	model->gradTotalField[i][j][1] = 
-	  grad4(i, j, juu, ju, jd, jdd, 1, model->totalField);
+        ju = iup(ly, j);
+        juu = iup(ly, ju);
+        jd = idown(ly, j);
+        jdd = idown(ly, jd);
+        model->gradTotalField[i][j][0] = grad4(i, j, iuu, iu, id, idd, 0, model->totalField);
+        model->gradTotalField[i][j][1] = grad4(i, j, juu, ju, jd, jdd, 1, model->totalField);
       }
     }
   }
@@ -271,10 +269,9 @@ void updateTotalField(Model* model) {
       iu = iup(lx, i);
       id = idown(lx, i);
       for (int j = 0; j < ly; j++) {
-	ju = iup(ly, j);
-	jd = idown(ly, j);
-	model->laplaceTotalField[i][j] = 
-	  laplacian(i, j, iu, id, ju, jd, model->totalField);
+        ju = iup(ly, j);
+        jd = idown(ly, j);
+        model->laplaceTotalField[i][j] = laplacian(i, j, iu, id, ju, jd, model->totalField);
       }
     }
   }
@@ -289,7 +286,7 @@ void updateTotalCellForceField(Model* model) {
 
   if (model->doShear > 0) {
     double extshearCoeff = model->frictionCoeff * model->shearrate;
-    double sx, sy;
+    double sx, sbool;
       
     if (model->activeShearCoeff > 0.0) {
       double shearCoeff = model->activeShearCoeff * model->thickness * model->thickness;
@@ -305,17 +302,15 @@ void updateTotalCellForceField(Model* model) {
         cpy = cell->py;
         cellField = cell->field[cell->getIndex];
           
-        if (iwrap(model->ly, cy) < (model-> ly)/3) {
-		sx = 1.0;
-		sy = 0.0;
-	 } else {
-        	sx = 0.0;
-        	sy = 0.0;
-	 }
+        if (abs(iwrap(model->ly, cy)-0.5*(model-> ly)) < (model-> ly)/8) {
+            sbool = 1.0;
+         } else {
+            sbool = 0.0;
+         }
     
 #pragma omp parallel for default(none) shared(model, cell, clx, cly, cx, cy) \
-    shared(cpx, cpy, cellField, polarCoeff, shearCoeff, extshearCoeff, sx, sy) \
-    private(x, y, phi, tphi, mux, muy, px, py, ax, ay) schedule(static)
+    shared(cpx, cpy, cellField, polarCoeff, shearCoeff, extshearCoeff, sbool) \
+    private(x, y, phi, tphi, mux, muy, px, py, ax, ay, sx) schedule(static)
         for (int i = 0; i < clx; i++) {
             x = iwrap(model->lx, cx+i);
             for (int j = 0; j < cly; j++) {
@@ -327,12 +322,12 @@ void updateTotalCellForceField(Model* model) {
                 muy = -phi * cell->gradChemPot[i][j][1];
                 px = phi * polarCoeff * cpx / tphi;
                 py = phi * polarCoeff * cpy / tphi;
-		sx = sx * phi * extshearCoeff / tphi;
+                sx = sbool * phi * extshearCoeff / tphi;
               } //close tphi if
               ax = shearCoeff * cell->divDeform[i][j][0];
               ay = shearCoeff * cell->divDeform[i][j][1];
               model->totalCellForceField[x][y][0] += (mux + px + ax + sx);
-              model->totalCellForceField[x][y][1] += (muy + py + ay + sy);
+              model->totalCellForceField[x][y][1] += (muy + py + ay);
            } //close int j loop
         } //close int i loop
       } //close int m loop
@@ -347,31 +342,29 @@ void updateTotalCellForceField(Model* model) {
         cpy = cell->py;
         cellField = cell->field[cell->getIndex];
           
-        if (iwrap(model->ly, cy) < (model-> ly)/3) {
-                sx = 1.0;
-                sy = 0.0;
+        if (abs(iwrap(model->ly, cy)-0.5*(model-> ly)) < (model-> ly)/8) {
+            sbool = 1.0;
         } else {
-        	sx = 0.0;
-        	sy = 0.0;
+            sbool = 0.0;
         }
 
 #pragma omp parallel for default(none)	\
-    shared(model, cell, clx, cly, cx, cy, cpx, cpy, cellField, polarCoeff, extshearCoeff, sx, sy) \
-    private(x, y, phi, tphi, mux, muy, px, py) schedule(static)
+    shared(model, cell, clx, cly, cx, cy, cpx, cpy, cellField, polarCoeff, extshearCoeff, sbool) \
+    private(x, y, phi, tphi, mux, muy, px, py, sx) schedule(static)
         for (int i = 0; i < clx; i++) {
           x = iwrap(model->lx, cx+i);
           for (int j = 0; j < cly; j++) {
             y = iwrap(model->ly, cy+j);
             tphi = model->totalField[x][y];
             if (tphi > 0.0) {
-		phi = cellField[i][j];
-		mux = -phi * cell->gradChemPot[i][j][0];
-		muy = -phi * cell->gradChemPot[i][j][1];
-		px = phi * polarCoeff * cpx / tphi;
-		py = phi * polarCoeff * cpy / tphi;
-		sx = sx * phi * extshearCoeff / tphi;
-		model->totalCellForceField[x][y][0] += (mux + px + sx);
-		model->totalCellForceField[x][y][1] += (muy + py + sy);
+                phi = cellField[i][j];
+                mux = -phi * cell->gradChemPot[i][j][0];
+                muy = -phi * cell->gradChemPot[i][j][1];
+                px = phi * polarCoeff * cpx / tphi;
+                py = phi * polarCoeff * cpy / tphi;
+                sx = sbool * phi * extshearCoeff / tphi;
+                model->totalCellForceField[x][y][0] += (mux + px + sx);
+                model->totalCellForceField[x][y][1] += (muy + py);
             } //close tphi if
           } //close int j loop
         } //close int i loop
