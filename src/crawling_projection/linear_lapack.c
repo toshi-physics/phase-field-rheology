@@ -67,7 +67,7 @@ int solver(double* mat, double* y, double* x, int nrow, int ncol, int copy) {
 void printMatrix(double* a, int m, int n) {
   for (int i = 0; i < m; i++) {
     for (int j = 0; j < n; j++) {
-      printf("%.5f ", a[m*j+i]);
+      printf("%g ", a[m*j+i]);
     }
     printf("\n");
   }

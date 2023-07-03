@@ -9,14 +9,14 @@
 #define PF_PI 3.14159265358979323846264338327950288
 #endif
 
+// Width of halo on each side of cell subdomain
+#ifndef PF_HALO
+#define PF_HALO 2
+#endif
+
 // Threshold of change in cm before doing a frame shift
 #ifndef PF_CMSHIFT
 #define PF_CMSHIFT 2.0
-#endif
-
-// Threhsold of overlap in phi_i^2phi_j^2 to be considered as neighbours
-#ifndef PF_OLAPTHRES 
-#define PF_OLAPTHRES 0.1
 #endif
 
 #endif

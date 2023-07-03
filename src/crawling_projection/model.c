@@ -22,7 +22,7 @@ Model* createModel(int lx, int ly, int ncells) {
   model->cellLx = lx;
   model->cellLy = ly;
   model->numOfCells = ncells;
-  model->dt = 0.01;
+  model->dt = 1.0;
   model->cellRadius = 1.0;
   model->thickness = 1.0;
   model->cahnHilliardCoeff = 0.0;
@@ -42,13 +42,15 @@ Model* createModel(int lx, int ly, int ncells) {
   model->cellXBoundCount = create1DIntArray(ncells);
   model->cellYBoundCount = create1DIntArray(ncells);
   model->cells = malloc(sizeof *model->cells * ncells);
+  model->computeForce = 0;
+  model->computeForceFreq = -1;
 
   // Reduction fields
   model->totalField = create2DDoubleArray(model->lx, model->ly);
   model->totalField2 = create2DDoubleArray(model->lx, model->ly);
   model->laplaceTotalField = create2DDoubleArray(model->lx, model->ly);
   model->gradTotalField = create3DDoubleArray(model->lx, model->ly, 2);
-  model->totalCellForceField = create3DDoubleArray(model->lx, model->ly, 2);
+  model->totalCellForceField = create3DDoubleArray(model->lx, model->ly, 6);
 
   // Viscous terms
   model->firstViscousCoeff = 0.0;
@@ -60,10 +62,16 @@ Model* createModel(int lx, int ly, int ncells) {
 
   // Force density
   model->totalForce = create1DDoubleArray(ncells*2);
+  model->capillForce = create1DDoubleArray(ncells*2);
+  model->polarForce = create1DDoubleArray(ncells*2);
+  model->activeShearForce = create1DDoubleArray(ncells*2);
+  model->viscousForce = create1DDoubleArray(ncells*2);
+  model->dampingForce = create1DDoubleArray(ncells*2);
 
   // Viscous matrix
   model->doOverlap  = 1;
   model->viscousMat = create1DDoubleArray(ncells*ncells*4);
+  model->overlapMat = create1DDoubleArray(ncells*ncells*4);
   
   // Velocity from matrix inversion
   model->solvedVelocity = create1DDoubleArray(ncells*2);
@@ -88,7 +96,13 @@ void deleteModel(Model* model) {
   free(model->cellXBoundCount);
   free(model->cellYBoundCount);
   free(model->viscousMat);
+  free(model->overlapMat);
   free(model->totalForce);
+  free(model->capillForce);
+  free(model->polarForce);
+  free(model->activeShearForce);
+  free(model->viscousForce);
+  free(model->dampingForce);
   free(model->solvedVelocity);
   free(model);
 }
@@ -97,8 +111,8 @@ void initCellsFromFile(Model* model, char* cellFile,
 		       unsigned long seed) {
   FILE* fcell = fopen(cellFile, "r");
   if (fcell == NULL) {
-    printf("Problem with opening the centre of mass file!\n");
-    return;
+    printf("ERROR: Problem with opening the centre of mass file!\n");
+    exit(1);
   }
   
   char line [1000];
@@ -113,7 +127,7 @@ void initCellsFromFile(Model* model, char* cellFile,
     if (nvar == 3 || nvar == 5) {
       x = (int) round(xcm-clx/2.0);
       y = (int) round(ycm-cly/2.0);
-      cell = createCell(x, y, clx, cly, model->diffusionCoeff, 0.5, 
+      cell = createCell(x, y, clx, cly, PF_HALO,  model->diffusionCoeff, 0.5, 
 			index+seed);
       cell->radius = model->cellRadius;
       if (nvar == 5) {
@@ -148,8 +162,12 @@ void initCellsFromFile(Model* model, char* cellFile,
 }
 
 void run(Model* model, int nsteps) {
-  output(model, 0); // Output initial state of the model
-  for (int n = 1; n <= nsteps; n++) {
+  for (int n = 0; n <= nsteps; n++) {
+    // Check if compute force
+    if (model->computeForceFreq > 0 && n % model->computeForceFreq == 0) {
+      model->computeForce = 1;
+    }
+    
     updateTotalField(model);
 
 #pragma omp parallel for default(none) shared(model) schedule(static)
@@ -180,12 +198,18 @@ void run(Model* model, int nsteps) {
 
     updateVelocity(model);
 
+    // Output model reuslts before updating the cell fields so that the
+    // computed forces and energy are in-sync with the current config of the
+    // system
+    output(model, n);
+    
 #pragma omp parallel for default(none) shared(model) schedule(static)
     for (int m = 0; m < model->numOfCells; m++) {
       updateCellField(model, m);
       updateCellCM(model, m);
     }
-    output(model, n);
+    // Unset compute force flag
+    model->computeForce = 0;
   }
 }
 
@@ -211,11 +235,15 @@ void updateTotalField(Model* model) {
       model->totalField2[i][j] = 0.0;
       model->totalCellForceField[i][j][0] = 0.0;
       model->totalCellForceField[i][j][1] = 0.0;
+      model->totalCellForceField[i][j][2] = 0.0;
+      model->totalCellForceField[i][j][3] = 0.0;
+      model->totalCellForceField[i][j][4] = 0.0;
+      model->totalCellForceField[i][j][5] = 0.0;
     }
   }
 
   Cell* cell;
-  int clx, cly, x, y, cx, cy;
+  int clx, cly, x, y, cx, cy, buf;
   double phi;
   double** cellField;
   
@@ -225,17 +253,19 @@ void updateTotalField(Model* model) {
     cly = cell->ly;
     cx = cell->x;
     cy = cell->y;
+    buf = cell->haloWidth;
     cellField = cell->field[cell->getIndex];
-#pragma omp parallel for default(none)			\
-  shared(model, lx, ly, cell, clx, cly, cx, cy, cellField)	\
+#pragma omp parallel for default(none)				\
+  shared(model, lx, ly, cell, clx, cly, cx, cy, buf, cellField)	\
   private(x, y, phi) schedule(static)
-    for (int i = 0; i < clx; i++) {
+    // No need to loop over halo area as phi = 0
+    for (int i = buf; i < clx-buf; i++) {
       x = iwrap(lx, cx+i);
-      for (int j = 0; j < cly; j++) {
-        y = iwrap(ly, cy+j);
-        phi = cellField[i][j];
-        model->totalField[x][y] += phi;
-        model->totalField2[x][y] += phi * phi;
+      for (int j = buf; j < cly-buf; j++) {
+	y = iwrap(ly, cy+j);
+	phi = cellField[i][j];
+	model->totalField[x][y] += phi;
+	model->totalField2[x][y] += phi * phi;
       }
     }
   }
@@ -245,18 +275,20 @@ void updateTotalField(Model* model) {
   if (model->firstViscousCoeff > 0.0 || model->secondViscousCoeff > 0.0) {
 #pragma omp parallel for default(none) shared(model, lx, ly)	\
   private(iu, iuu, id, idd, ju, juu, jd, jdd) schedule(static)
-    for (int i = 2; i < lx-2; i++) {
+    for (int i = 0; i < lx; i++) {
       iu = iup(lx, i);
       iuu = iup(lx, iu);
       id = idown(lx, i);
       idd = idown(lx, id);
-      for (int j = 2; j < ly-2; j++) {
-        ju = iup(ly, j);
-        juu = iup(ly, ju);
-        jd = idown(ly, j);
-        jdd = idown(ly, jd);
-        model->gradTotalField[i][j][0] = grad4(i, j, iuu, iu, id, idd, 0, model->totalField);
-        model->gradTotalField[i][j][1] = grad4(i, j, juu, ju, jd, jdd, 1, model->totalField);
+      for (int j = 0; j < ly; j++) {
+	ju = iup(ly, j);
+	juu = iup(ly, ju);
+	jd = idown(ly, j);
+	jdd = idown(ly, jd);
+	model->gradTotalField[i][j][0] = 
+	  grad4(i, j, iuu, iu, id, idd, 0, model->totalField);
+	model->gradTotalField[i][j][1] = 
+	  grad4(i, j, juu, ju, jd, jdd, 1, model->totalField);
       }
     }
   }
@@ -269,9 +301,10 @@ void updateTotalField(Model* model) {
       iu = iup(lx, i);
       id = idown(lx, i);
       for (int j = 0; j < ly; j++) {
-        ju = iup(ly, j);
-        jd = idown(ly, j);
-        model->laplaceTotalField[i][j] = laplacian(i, j, iu, id, ju, jd, model->totalField);
+	ju = iup(ly, j);
+	jd = idown(ly, j);
+	model->laplaceTotalField[i][j] = 
+	  laplacian(i, j, iu, id, ju, jd, model->totalField);
       }
     }
   }
@@ -279,11 +312,12 @@ void updateTotalField(Model* model) {
 
 void updateTotalCellForceField(Model* model) {
   Cell* cell;
-  int clx, cly, x, y, cx, cy;
+  int clx, cly, x, y, cx, cy, buf;
   double** cellField;
   double phi, tphi, mux, muy, px, py, cpx, cpy;
   double polarCoeff = model->frictionCoeff * model->motility;
 
+<<<<<<< HEAD
   if (model->doShear > 0) {
     double extshearCoeff = model->frictionCoeff * model->shearrate;
     double sx, sbool;
@@ -441,6 +475,88 @@ void updateTotalCellForceField(Model* model) {
     } //close active shear else
   } //close external shear else
 } //close updateTotalCellForce func def
+=======
+  if (model->activeShearCoeff > 0.0) {
+    double shearCoeff = model->activeShearCoeff * 
+      model->thickness * model->thickness;
+    double ax, ay;
+    
+    for (int m = 0; m < model->numOfCells; m++) {
+      cell = model->cells[m];
+      clx = cell->lx;
+      cly = cell->ly;
+      cx = cell->x;
+      cy = cell->y;
+      cpx = cell->px;
+      cpy = cell->py;
+      buf = cell->haloWidth;
+      cellField = cell->field[cell->getIndex];
+    
+#pragma omp parallel for default(none) shared(model, cell, clx, cly, cx, cy) \
+  shared(buf, cpx, cpy, cellField, polarCoeff, shearCoeff)		\
+  private(x, y, phi, tphi, mux, muy, px, py, ax, ay) schedule(static)
+      // No need to loop over halo area where phi = 0
+      for (int i = buf; i < clx-buf; i++) {
+	x = iwrap(model->lx, cx+i);
+	for (int j = buf; j < cly-buf; j++) {
+	  y = iwrap(model->ly, cy+j);
+	  tphi = model->totalField[x][y];
+	  if (tphi > 0.0) {
+	    phi = cellField[i][j];
+	    mux = -phi * cell->gradChemPot[i][j][0];
+	    muy = -phi * cell->gradChemPot[i][j][1];
+	    model->totalCellForceField[x][y][0] += mux;
+	    model->totalCellForceField[x][y][1] += muy;
+	    px = phi * polarCoeff * cpx / tphi;
+	    py = phi * polarCoeff * cpy / tphi;
+	    model->totalCellForceField[x][y][2] += px;
+	    model->totalCellForceField[x][y][3] += py;
+	  }
+	  ax = shearCoeff * cell->divDeform[i][j][0];
+	  ay = shearCoeff * cell->divDeform[i][j][1];
+	  model->totalCellForceField[x][y][4] += ax;
+	  model->totalCellForceField[x][y][5] += ay;	    
+	}
+      }
+    }
+  } else { // activeShearCoeff = 0.0
+    for (int m = 0; m < model->numOfCells; m++) {
+      cell = model->cells[m];
+      clx = cell->lx;
+      cly = cell->ly;
+      cx = cell->x;
+      cy = cell->y;
+      cpx = cell->px;
+      cpy = cell->py;
+      buf = cell->haloWidth;
+      cellField = cell->field[cell->getIndex];
+
+#pragma omp parallel for default(none)					\
+  shared(model, cell, clx, cly, cx, cy, cpx, cpy, buf, cellField, polarCoeff) \
+  private(x, y, phi, tphi, mux, muy, px, py) schedule(static)
+      // No need to loop over halo area where phi = 0      
+      for (int i = buf; i < clx-buf; i++) {
+	x = iwrap(model->lx, cx+i);
+	for (int j = buf; j < cly-buf; j++) {
+	  y = iwrap(model->ly, cy+j);
+	  tphi = model->totalField[x][y];
+	  if (tphi > 0.0) {
+	    phi = cellField[i][j];
+	    mux = -phi * cell->gradChemPot[i][j][0];
+	    muy = -phi * cell->gradChemPot[i][j][1];
+	    model->totalCellForceField[x][y][0] += mux;
+	    model->totalCellForceField[x][y][1] += muy;
+	    px = phi * polarCoeff * cpx / tphi;
+	    py = phi * polarCoeff * cpy / tphi;
+	    model->totalCellForceField[x][y][2] += px;
+	    model->totalCellForceField[x][y][3] += py;
+	  }
+	}
+      }
+    }
+  }
+}
+>>>>>>> mchiang_ppm/main
 
 void updateViscous(Model* model) {
   int ncells = model->numOfCells;
@@ -449,11 +565,12 @@ void updateViscous(Model* model) {
   double zeta = model->secondViscousCoeff;
   double gamma = model->frictionCoeff;
   double* visMat = model->viscousMat;
+  double* olapMat = model->overlapMat;
   int doViscous = (eta > 0.0 || zeta > 0.0);
 
   // Compute the overlap 
-#pragma omp parallel for default(none) shared(model, doViscous)		\
-  shared(ncells, twoncells, visMat, eta, zeta, gamma) schedule(dynamic,1)
+#pragma omp parallel for default(none) shared(model, doViscous, ncells)	\
+  shared(twoncells, visMat, olapMat, eta, zeta, gamma) schedule(dynamic,1)
   for (int m = 0; m < ncells; m++) {
     Cell* cellm = model->cells[m];
     double** phim = cellm->field[cellm->getIndex];
@@ -500,7 +617,12 @@ void updateViscous(Model* model) {
 	visMat[nmyx] = 0.0;
 	visMat[nmxy] = 0.0;
 	visMat[nmyy] = 0.0;
-	
+	if (model->computeForce) {
+	  olapMat[mnxx] = 0.0;
+	  olapMat[mnyy] = 0.0;
+	  olapMat[nmxx] = 0.0;
+	  olapMat[nmyy] = 0.0;
+	}
 	// Only do calculation if there is overlap 
 	// between the two cells' domains
 	if (abs(dxmn) < clxm && abs(dymn) < clym) {
@@ -582,7 +704,6 @@ void updateViscous(Model* model) {
 	    olap *= gamma;
 	    double vismndg = eta * (vismnxx + vismnyy) + olap;
 	    double visnmdg = eta * (visnmxx + visnmyy) + olap;
-	    
 	    visMat[mnxx] = zeta * vismnxx + vismndg;
 	    visMat[mnyx] = zeta * vismnyx;
 	    visMat[mnxy] = zeta * vismnxy;
@@ -591,6 +712,12 @@ void updateViscous(Model* model) {
 	    visMat[nmyx] = zeta * visnmyx;
 	    visMat[nmxy] = zeta * visnmxy;
 	    visMat[nmyy] = zeta * visnmyy + visnmdg;
+	    if (model->computeForce) {
+	      olapMat[mnxx] = olap;
+	      olapMat[mnyy] = olap;
+	      olapMat[nmxx] = olap;
+	      olapMat[nmyy] = olap;
+	    }
 	  } else { // If eta and zeta are both zero
 	    for (int i = 0; i < lenx; i++) {
 	      xm = xmstart + i;
@@ -605,7 +732,7 @@ void updateViscous(Model* model) {
 		double pn = phin[xn][yn];
 		double tphi = model->totalField[x][y];
 		// Update overlap term
-		if (pm > 0.0 || pn > 0.0) {
+		if (tphi > 0.0) {
 		  olap += pm * pn / tphi;
 		}
 	      } // Close loop over j
@@ -615,6 +742,12 @@ void updateViscous(Model* model) {
 	    visMat[mnyy] = olap;
 	    visMat[nmxx] = olap;
 	    visMat[nmyy] = olap;
+	    if (model->computeForce) {
+	      olapMat[mnxx] = olap;
+	      olapMat[mnyy] = olap;
+	      olapMat[nmxx] = olap;
+	      olapMat[nmyy] = olap;
+	    }
 	  } // Close if block for doViscous
 	} // Close if block for overlap
       } // Close loop over cell n
@@ -632,15 +765,15 @@ void updateCellChemPotAndDeform(Model* model, int m) {
   int cly = cell->ly;
   int cx = cell->x;
   int cy = cell->y;
+  int buf = cell->haloWidth;
   int x, y; // Lab frame coordinates of a lattice element
   int iu, iuu, id, idd, ju, juu, jd, jdd; // Nearest neighbours
   double** cellField = cell->field[cell->getIndex];
   double phi, lphi, cahnHilliard, volumeConstraint, repulsion;
   double adhesion = 0.0;
   double thickness2 = model->thickness * model->thickness;
-  // Need to update overlap first
+  // Need to update overlap first which computes the cell's volume
   double scaledVolume = cell->volume / (PF_PI * cell->radius * cell->radius);
-  double athird = 1.0 / 3.0;
   double kappa = 2.0 * model->cahnHilliardCoeff;
   double epsilon = 2.0 * model->repulsionCoeff;
   double lambda = 4.0 * model->volumePenaltyCoeff;
@@ -648,7 +781,7 @@ void updateCellChemPotAndDeform(Model* model, int m) {
   
   // Apply fixed (Dirichlet) boundary conditions (phi = 0 at boundaries)
   // i and j are coordinates in the cell's own reference frame
-  for (int i = 2; i < clx-2; i++) {
+  for (int i = buf; i < clx-buf; i++) {
     iu = iup(clx, i);
     id = idown(clx, i);
     if (model->activeShearCoeff > 0.0) {
@@ -656,7 +789,7 @@ void updateCellChemPotAndDeform(Model* model, int m) {
       idd = idown(clx, id);
     }
     x = iwrap(model->lx, cx+i);
-    for (int j = 2; j < cly-2; j++) {
+    for (int j = buf; j < cly-buf; j++) {
       ju = iup(cly, j);
       jd = idown(cly, j);
       y = iwrap(model->ly, cy+j);
@@ -673,9 +806,9 @@ void updateCellChemPotAndDeform(Model* model, int m) {
 	double g2pxy = cgrad4(i, j, iuu, iu, id, idd, 1, 0, cell->gradField);
 	double g2pyy = cgrad4(i, j, juu, ju, jd, jdd, 1, 1, cell->gradField);
 	cell->divDeform[i][j][0] += 
-	  athird * (g2pxx * gpx + g2pxy * gpy) + gpx * lphi;
+	  ((g2pxx * gpx + g2pxy * gpy) / 3.0 + gpx * lphi);
 	cell->divDeform[i][j][1] +=
-	  athird * (g2pxy * gpx + g2pyy * gpy) + gpy * lphi; // g2pyx = g2pxy
+	  ((g2pxy * gpx + g2pyy * gpy) / 3.0 + gpy * lphi); // g2pyx = g2pxy
       }
 
       // Compute chemical potential field
@@ -700,12 +833,12 @@ void updateCellChemPotAndDeform(Model* model, int m) {
   } // Close loop over i
   
   // Compute gradient of the chemical potential
-  for (int i = 2; i < clx-2; i++) {
+  for (int i = buf; i < clx-buf; i++) {
     iu = iup(clx, i);
     iuu = iup(clx, iu);
     id = idown(clx, i);
     idd = idown(clx, id);
-    for (int j = 2; j < cly-2; j++) {
+    for (int j = buf; j < cly-buf; j++) {
       ju = iup(cly, j);
       juu = iup(cly, ju);
       jd = idown(cly, j);
@@ -736,69 +869,39 @@ void updateCellForces(Model* model, int m) {
   int cly = cell->ly;
   int cx = cell->x;
   int cy = cell->y;
+  int buf = cell->haloWidth;
   int mx = 2 * m;
   int my = mx + 1;
   double** cellField = cell->field[cell->getIndex];
-  double* tot = model->totalForce;
-  double fx = 0.0;
-  double fy = 0.0;
-  for (int i = 0; i < clx; i++) {
+  double fcx = 0.0;
+  double fcy = 0.0;
+  double fpx = 0.0;
+  double fpy = 0.0;
+  double fax = 0.0;
+  double fay = 0.0;
+  for (int i = buf; i < clx-buf; i++) {
     x = iwrap(model->lx, cx+i);
-    for (int j = 0; j < cly; j++) {
+    for (int j = buf; j < cly-buf; j++) {
       y = iwrap(model->ly, cy+j);
       phi = cellField[i][j];
-      fx += phi * model->totalCellForceField[x][y][0];
-      fy += phi * model->totalCellForceField[x][y][1];
+      fcx += phi * model->totalCellForceField[x][y][0];
+      fcy += phi * model->totalCellForceField[x][y][1];
+      fpx += phi * model->totalCellForceField[x][y][2];
+      fpy += phi * model->totalCellForceField[x][y][3];
+      fax += phi * model->totalCellForceField[x][y][4];
+      fay += phi * model->totalCellForceField[x][y][5];
     }
   }
-  tot[mx] = fx;
-  tot[my] = fy;
-}
-
-void updateVelocityShear(Model* model) {
-  //this is to add a const shear velocity on top of solved velocity
-  int ncells = model->numOfCells;
-  int twoncells = ncells * 2;
-  Cell* cell;
-  int mx, my;
-  double cvx, cvy;
-  int doViscous = (model->firstViscousCoeff > 0.0 ||
-                   model->secondViscousCoeff > 0.0);
-  if (model->doOverlap || doViscous) {
-    int error = solver(model->viscousMat, model->totalForce,
-                       model->solvedVelocity, twoncells, 1, 0);
-    if (error != 0) {
-      printf("Error: solution cannot be found for the matrix equation\n");
-      exit(1);
-    }
-    for (int m = 0; m < ncells; m++) {
-      mx = 2 * m;
-      my = mx + 1;
-      cell = model->cells[m];
-      cvx = model->solvedVelocity[mx];
-      if (cell->ycm < model->ly/3.0) {
-        cvx = cvx + model->shearrate;
-      }
-      cvy = model->solvedVelocity[my];
-      cell->vx = cvx;
-      cell->vy = cvy;
-      cell->v = sqrt(cvx * cvx + cvy * cvy);
-    }
-  } else { // Do simple divsion by cell volume
-    for (int m = 0; m < ncells; m++) {
-      mx = 2 * m;
-      my = mx + 1;
-      cell = model->cells[m];
-      cvx = model->totalForce[mx] / cell->volume / model->frictionCoeff;
-      cvy = model->totalForce[my] / cell->volume / model->frictionCoeff;
-      if (cell->ycm < model->ly/3.0) {
-        cvx = cvx + model->shearrate;
-      }
-      cell->vx = cvx;
-      cell->vy = cvy;
-      cell->v = sqrt(cvx * cvx + cvy * cvy);
-    }
+  if (model->computeForce) {
+    model->capillForce[mx] = fcx;
+    model->capillForce[my] = fcy;
+    model->polarForce[mx] = fpx;
+    model->polarForce[my] = fpy;
+    model->activeShearForce[mx] = fax;
+    model->activeShearForce[my] = fay;
   }
+  model->totalForce[mx] = fcx + fpx + fax;
+  model->totalForce[my] = fcy + fpy + fay;
 }
 
 void updateVelocity(Model* model) {
@@ -812,10 +915,15 @@ void updateVelocity(Model* model) {
   int doViscous = (model->firstViscousCoeff > 0.0 || 
 		   model->secondViscousCoeff > 0.0);
   if (model->doOverlap || doViscous) {
+    //printf("Start of matrix inversion ...\n");
+    //printMatrix(model->viscousMat, twoncells, twoncells);
     int error = solver(model->viscousMat, model->totalForce, 
 		       model->solvedVelocity, twoncells, 1, 0);
+    //printf("End of matrix inversion ...\n");
+    // Don't use data from viscousMat after this as it will be LU factorised
+    // The matrix is not copied to improve efficiency
     if (error != 0) {
-      printf("Error: solution cannot be found for the matrix equation\n");
+      printf("ERROR: solution cannot be found for the matrix equation\n");
       exit(1);
     }
     for (int m = 0; m < ncells; m++) {
@@ -828,6 +936,15 @@ void updateVelocity(Model* model) {
       cell->vy = cvy;
       cell->v = sqrt(cvx * cvx + cvy * cvy);
     }
+    // Compute the viscous and damping force
+    if (model->computeForce) {
+      matvec(model->overlapMat, model->solvedVelocity, model->dampingForce,
+	     twoncells, twoncells);
+      for (int m = 0; m < twoncells; m++) {
+	model->viscousForce[m] = model->dampingForce[m] - model->totalForce[m];
+	model->dampingForce[m] *= -1.0;
+      }
+    }
   } else { // Do simple divsion by cell volume
     for (int m = 0; m < ncells; m++) {
       mx = 2 * m;
@@ -838,6 +955,10 @@ void updateVelocity(Model* model) {
       cell->vx = cvx;
       cell->vy = cvy;
       cell->v = sqrt(cvx * cvx + cvy * cvy);
+      if (model->computeForce) {
+	model->dampingForce[mx] = -model->totalForce[mx];
+	model->dampingForce[my] = -model->totalForce[my];
+      }
     }
   }
 }
@@ -849,18 +970,19 @@ void updateCellField(Model* model, int m) {
   int cly = cell->ly;
   int set = cell->setIndex;
   int get = cell->getIndex;
+  int buf = cell->haloWidth;
   int iuu, iu, id, idd, juu, ju, jd, jdd;
   double advection;
   double** cellField = cell->field[get];
   
   // Apply fixed (Dirichlet) boundary conditions (phi = 0 at boundaries)
   // i and j are coordinates in the cell's own reference frame
-  for (int i = 2; i < clx-2; i++) {
+  for (int i = buf; i < clx-buf; i++) {
     iu = iup(clx, i);
     iuu = iup(clx, iu);
     id = idown(clx, i);
     idd = idown(clx, id);
-    for (int j = 2; j < cly-2; j++) {
+    for (int j = buf; j < cly-buf; j++) {
       ju = iup(cly, j);
       juu = iup(cly, ju);
       jd = idown(cly, j);

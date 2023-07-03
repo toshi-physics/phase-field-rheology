@@ -1,5 +1,5 @@
 
-#CC := gcc
+# CC := gcc
 # CC := gcc-10
 CC := $(CC)
 CFLAGS := -Wall -Wshadow -Winline -O3 -std=c11 -fopenmp -flto -g
@@ -23,11 +23,11 @@ PRG_SUFFIX =
 # 0 = no armadillo and 1 = with armadillo
 HAS_ARMA := 1
 
-ODIR := $(BIN)/obj
-EDIR := $(BIN)/exe
-LODIR := $(BIN)/lib
+ODIR := $(BIN)/obj/
+EDIR := $(BIN)/exe/
+LODIR := $(BIN)/lib/
 
-SRC_C := cell.c model.c array.c image.c overlap.c dump.c dump_cm.c dump_bulk_cm.c dump_field.c dump_cell_field.c dump_gyration.c dump_gyration_field.c dump_velocity.c dump_velocity_field.c dump_deform.c dump_deform_field.c dump_neighbour.c dump_energy.c dump_overlap.c dump_overlap_field.c dump_index_field.c random_mtwister.c util.c linear_lapack.c
+SRC_C := cell.c model.c array.c image.c overlap.c dump.c dump_cm.c dump_bulk_cm.c dump_field.c dump_cell_field.c dump_gyration.c dump_gyration_field.c dump_velocity.c dump_velocity_field.c dump_deform.c dump_deform_field.c dump_neighbour.c dump_energy.c dump_force.c dump_overlap.c dump_overlap_field.c dump_index_field.c random_mtwister.c util.c linear_lapack.c
 SRC_CXX := neighbour.cpp
 ifeq ($(HAS_ARMA),1)
 	SRC_C := $(SRC_C) shape.c dump_shape.c
@@ -38,10 +38,8 @@ OBJ_C := $(patsubst %.c, $(ODIR)/%.o, $(SRC_C))
 OBJ_CXX := $(patsubst %.cpp, $(ODIR)/%.o, $(SRC_CXX))
 PRG_SRC := run_model.c
 PRG_OBJ := $(patsubst %.c, $(ODIR)/%.o, $(PRG_SRC))
-#LSRC := ../../lib/mtwister/mtwister.c ../../lib/arralloc/arralloc.c
 LSRC := mtwister.c arralloc.c
 LOBJ := $(patsubst %.c, $(LODIR)/%.o, $(LSRC))
-#LOBJ := $(patbust %.c, %.o, $(LSRC))
 PRG := $(patsubst %.c, $(EDIR)/%$(PRG_SUFFIX), $(PRG_SRC))
 
 all : check_arma make_bin $(LOBJ) $(OBJ) $(PRG_OBJ) $(PRG)

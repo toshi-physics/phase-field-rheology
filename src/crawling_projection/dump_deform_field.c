@@ -33,50 +33,54 @@ void deformFieldOutput(DeformFieldDump* dump, Model* model,
   // Sum over all the phase fields, each weighted by the deformation tensor
   // of the cell
   Cell* cell;
-  int clx, cly, cx, cy, x, y;
+  int clx, cly, cx, cy, x, y, buf;
   int iuu, iu, id, idd, juu, ju, jd, jdd; // Nearest neighbours
-  double gphix, gphiy, sxx, sxy;
+  double gphix, gphiy, sxx, syy, sxy;
   double** cellField;
-  double*** field = create3DDoubleArray(model->lx, model->ly, 2);
+  double*** field = create3DDoubleArray(model->lx, model->ly, 3);
   for (int m = 0; m < model->numOfCells; m++) {
     cell = model->cells[m];
     clx = cell->lx;
     cly = cell->ly;
     cx = cell->x;
     cy = cell->y;
+    buf = cell->haloWidth;
     cellField = cell->field[cell->getIndex];
     sxx = 0.0;
+    syy = 0.0;
     sxy = 0.0;
-    for (int i = 2; i < clx-2; i++) {
+    for (int i = buf; i < clx-buf; i++) {
       iu = iup(clx, i);
       iuu = iup(clx, iu);
       id = idown(clx, i);
       idd = idown(clx, id);
-      for (int j = 2; j < cly-2; j++) {
+      for (int j = buf; j < cly-buf; j++) {
 	ju = iup(cly, j);
 	juu = iup(cly, ju);
 	jd = idown(cly, j);
 	jdd = idown(cly, jd);
 	gphix = grad4(i, j, iuu, iu, id, idd, 0, cellField);
 	gphiy = grad4(i, j, juu, ju, jd, jdd, 1, cellField);
-	sxx += gphiy * gphiy - gphix * gphix;
-	sxy -= gphix * gphiy;
+	sxx += gphix * gphix; // Use +ve sign here to save storage space
+	syy += gphiy * gphiy;
+	sxy += gphix * gphiy;
       }
-    }
-    sxx *= 0.5;
+    }    
     // Add results to total field
-    for (int i = 0; i < clx; i++) {
-      for (int j = 0; j < cly; j++) {
+    for (int i = buf; i < clx-buf; i++) {
+      for (int j = buf; j < cly-buf; j++) {
 	x = iwrap(model->lx, cx+i);
 	y = iwrap(model->ly, cy+j);
 	field[x][y][0] += cellField[i][j] * sxx;
-	field[x][y][1] += cellField[i][j] * sxy;
+	field[x][y][1] += cellField[i][j] * syy;
+	field[x][y][2] += cellField[i][j] * sxy;
       }
     }
   }
   for (int i = 0; i < model->lx; i++) {
     for (int j = 0; j < model->ly; j++) {
-      fprintf(f, "%d %d %g %g\n", i, j, field[i][j][0], field[i][j][1]);
+      fprintf(f, "%d %d %g %g %g\n", i, j,
+	      field[i][j][0], field[i][j][1], field[i][j][2]);
     }
     fprintf(f,"\n");
   }

@@ -38,7 +38,7 @@ void overlapFieldOutput(OverlapFieldDump* dump, Model* model,
   computeOverlap(dump->analyser, model, dump->cellIndex);
   for (int i = 0; i < clx; i++) {
     for (int j = 0; j < cly; j++) {
-      fprintf(f, "%d %d %.5f\n", i, j, dump->analyser->overlapField[i][j]);
+      fprintf(f, "%d %d %g\n", i, j, dump->analyser->overlapField[i][j]);
     }
     fprintf(f, "\n");
   }  

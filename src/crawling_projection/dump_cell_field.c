@@ -33,7 +33,7 @@ void cellFieldOutput(CellFieldDump* dump, Model* model, int step) {
   double** cellField = cell->field[cell->getIndex];
   for (int i = 0; i < clx; i++) {
     for (int j = 0; j < cly; j++) {
-      fprintf(f, "%d %d %.5f\n", i, j, cellField[i][j]);
+      fprintf(f, "%d %d %g\n", i, j, cellField[i][j]);
     }
     fprintf(f, "\n");
   }  

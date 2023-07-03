@@ -28,9 +28,9 @@ void deformOutput(DeformDump* dump, Model* model, int step) {
   }
   
   Cell* cell;
-  int clx, cly;
+  int clx, cly, buf;
   int iuu, iu, id, idd, juu, ju, jd, jdd; // Nearest neighbours
-  double gphix, gphiy, sxx, sxy, s, s1, s1x, s1y, s2, s2x, s2y;
+  double gphix, gphiy, sxx, syy, sxy;//, s, s1, s1x, s1y, s2, s2x, s2y;
   double** cellField;
 
   fprintf(f, "Cells: %d\n", model->numOfCells);
@@ -39,37 +39,29 @@ void deformOutput(DeformDump* dump, Model* model, int step) {
     cell = model->cells[m];
     clx = cell->lx;
     cly = cell->ly;
+    buf = cell->haloWidth;
     cellField = cell->field[cell->getIndex];
     sxx = 0.0;
+    syy = 0.0;
     sxy = 0.0;
-    for (int i = 2; i < clx-2; i++) {
+    for (int i = buf; i < clx-buf; i++) {
       iu = iup(clx, i);
       iuu = iup(clx, iu);
       id = idown(clx, i);
       idd = idown(clx, id);
-      for (int j = 2; j < cly-2; j++) {
+      for (int j = buf; j < cly-buf; j++) {
 	ju = iup(cly, j);
 	juu = iup(cly, ju);
 	jd = idown(cly, j);
 	jdd = idown(cly, jd);
 	gphix = grad4(i, j, iuu, iu, id, idd, 0, cellField);
 	gphiy = grad4(i, j, juu, ju, jd, jdd, 1, cellField);
-	sxx += gphiy * gphiy - gphix * gphix;
-	sxy -= gphix * gphiy;
+	sxx += gphix * gphix; // Use +ve sign here to save storage space
+	syy += gphiy * gphiy;
+	sxy += gphix * gphiy;
       }
     }
-    sxx *= 0.5;
-    // Compute eigenvalues and eigenvectors
-    s = sqrt(sxx * sxx + sxy * sxy);
-    s1y = (s - sxx) / sxy;
-    s1 = sqrt(1.0 + s1y * s1y); // s1x = 1.0
-    s1x = 1.0 / s1;
-    s1y /= s1;
-    s2y = -(s + sxx) / sxy;
-    s2 = sqrt(1.0 + s2y * s2y); // s2x = 1.0
-    s2x = 1.0 / s2;
-    s2y /= s2;
-    fprintf(f, "%f %f %f %f %f %f %f\n", sxx, sxy, s, s1x, s1y, s2x, s2y);
+    fprintf(f, "%f %f %f\n", sxx, syy, sxy);
   }
   fclose(f);
   if (dump->overwrite) {

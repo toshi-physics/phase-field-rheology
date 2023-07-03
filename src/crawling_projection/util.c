@@ -18,17 +18,13 @@ inline int idown(int len, int i) {
 }
 
 inline int idiff(int len, int i1, int i2) {
-  int di1 = i1-i2;
-  int adi1 = abs(di1);
-  int adi2 = len-adi1;
-  return adi1 < adi2 ? di1 : -sgni(di1)*adi2;
+  int delta = i1-i2;
+  return delta-(int)round(delta/(double)len)*len;
 }
 
 inline double ddiff(double len, double d1, double d2) {
-  double dd1 = d1-d2;
-  double add1 = fabs(dd1);
-  double add2 = len-add1;
-  return add1 < add2 ? dd1 : -sgnd(dd1)*add2;
+  double delta = d1-d2;
+  return delta-round(delta/len)*len;
 }
 
 inline double laplacian(int i, int j, int iu, int id, int ju, int jd, 
@@ -85,12 +81,4 @@ inline double upwind(int i, int j, int uu, int u, int d, int dd, int comp,
 	 3.0 * field[i][j] - 2.0 * field[i][d]) / 6.0;
   default: return 0.0;
   }
-}
-
-inline int sgni(int val) {
-  return (0 < val) - (val < 0);
-}
-
-inline double sgnd(double val) {
-  return (0.0 < val) - (val < 0.0);
 }
